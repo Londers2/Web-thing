@@ -1,21 +1,39 @@
 // components/orders/OrderList.jsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { useSession } from 'next-auth/react'
+import debounce from 'lodash/debounce'
+import Pagination from '@/components/Pagination'
+
+const ITEMS_PER_PAGE = 5
 
 export default function OrderList() {
-  const { data: session } = useSession()
   const [orders, setOrders] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [localSearch, setLocalSearch] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: ITEMS_PER_PAGE,
+    totalPages: 0
+  })
+  const isFirstRender = useRef(true)
   
+  // Загружаем заказы при изменении фильтра, поиска или страницы
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      fetchOrders()
+      return
+    }
+    
     fetchOrders()
-  }, [filter, search])
+  }, [filter, search, currentPage])
   
   const fetchOrders = async () => {
     try {
@@ -24,7 +42,9 @@ export default function OrderList() {
       
       const params = new URLSearchParams()
       if (filter !== 'all') params.append('status', filter)
-      if (search) params.append('search', search)
+      if (search.trim()) params.append('search', search.trim())
+      params.append('page', currentPage)
+      params.append('limit', ITEMS_PER_PAGE)
       
       const res = await fetch(`/api/orders?${params}`)
       
@@ -34,7 +54,13 @@ export default function OrderList() {
       }
       
       const data = await res.json()
-      setOrders(Array.isArray(data) ? data : [])
+      setOrders(data.data || [])
+      setPagination(data.pagination || {
+        total: 0,
+        page: 1,
+        limit: ITEMS_PER_PAGE,
+        totalPages: 0
+      })
     } catch (error) {
       console.error('Error fetching orders:', error)
       setError(error.message || 'Ошибка загрузки заказов')
@@ -42,6 +68,37 @@ export default function OrderList() {
     } finally {
       setLoading(false)
     }
+  }
+  
+  const debouncedSearch = useCallback(
+    debounce((value) => {
+      setSearch(value)
+      setCurrentPage(1) // Сбрасываем страницу при новом поиске
+    }, 500),
+    []
+  )
+  
+  const handleSearchChange = (e) => {
+    const value = e.target.value
+    setLocalSearch(value)
+    debouncedSearch(value)
+  }
+  
+  const handleFilterChange = (e) => {
+    setFilter(e.target.value)
+    setCurrentPage(1) // Сбрасываем страницу при смене фильтра
+  }
+  
+  const handleClearSearch = () => {
+    setLocalSearch('')
+    setSearch('')
+    setCurrentPage(1)
+    debouncedSearch.cancel()
+  }
+  
+  const handlePageChange = (page) => {
+    setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   
   const getStatusColor = (status) => {
@@ -64,9 +121,12 @@ export default function OrderList() {
     return labels[status] || status
   }
   
-  if (loading) {
-    return <div className="text-center py-8">Загрузка заказов...</div>
-  }
+  // Отмена debounce при размонтировании
+  useEffect(() => {
+    return () => {
+      debouncedSearch.cancel()
+    }
+  }, [debouncedSearch])
   
   if (error) {
     return (
@@ -84,18 +144,34 @@ export default function OrderList() {
   
   return (
     <div>
-      <div className="flex flex-wrap gap-4 mb-6">
-        <input
-          type="text"
-          placeholder="Поиск заказов..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-[200px] px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-        />
+      {/* Поиск и фильтры */}
+      <div className="flex flex-wrap gap-4 mb-6 sticky top-0 bg-gray-100 dark:bg-gray-950 py-4 z-10">
+        <div className="flex-1 min-w-[200px] relative">
+          <input
+            type="text"
+            placeholder="Поиск заказов..."
+            value={localSearch}
+            onChange={handleSearchChange}
+            className="w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+          {localSearch && (
+            <button
+              onClick={handleClearSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          )}
+          {search && localSearch && search !== localSearch && (
+            <span className="absolute right-10 top-1/2 -translate-y-1/2">
+              <span className="inline-block w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></span>
+            </span>
+          )}
+        </div>
         
         <select
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          onChange={handleFilterChange}
           className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
         >
           <option value="all">Все заказы</option>
@@ -107,20 +183,44 @@ export default function OrderList() {
         
         <Link
           href="/order/new"
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors whitespace-nowrap"
         >
           + Создать заказ
         </Link>
       </div>
       
-      {orders.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <p className="text-gray-500">Заказов пока нет</p>
-          <Link href="/order/new" className="mt-4 inline-block text-blue-600 hover:underline">
-            Создать первый заказ
-          </Link>
+      {/* Статус загрузки */}
+      {loading && (
+        <div className="text-center py-8">
+          <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-2 text-gray-500">Загрузка заказов...</p>
         </div>
-      ) : (
+      )}
+      
+      {/* Результаты */}
+      {!loading && orders.length === 0 && (
+        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <p className="text-gray-500">
+            {search ? 'Заказов по вашему запросу не найдено' : 'Заказов пока нет'}
+          </p>
+          {search && (
+            <button
+              onClick={handleClearSearch}
+              className="mt-4 text-blue-600 hover:underline"
+            >
+              Очистить поиск
+            </button>
+          )}
+          {!search && (
+            <Link href="/order/new" className="mt-4 inline-block text-blue-600 hover:underline">
+              Создать первый заказ
+            </Link>
+          )}
+        </div>
+      )}
+      
+      {/* Список заказов */}
+      {!loading && orders.length > 0 && (
         <div className="grid gap-4">
           {orders.map((order) => (
             <div
@@ -162,7 +262,6 @@ export default function OrderList() {
                     )}
                   </div>
                   
-                  {/* ОТОБРАЖЕНИЕ КЛИЕНТА */}
                   {order.client ? (
                     <Link 
                       href={`/clients/${order.client.id}`}
@@ -203,6 +302,15 @@ export default function OrderList() {
               </div>
             </div>
           ))}
+          
+          {/* Пагинация */}
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            onPageChange={handlePageChange}
+          />
         </div>
       )}
     </div>

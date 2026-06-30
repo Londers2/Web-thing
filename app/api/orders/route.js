@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { Order, Client, Image } from '@/lib/db/index.js'
 import { Op } from 'sequelize'
 
-// GET - список заказов
+// GET - список заказов с фильтрацией и пагинацией
 export async function GET(request) {
   try {
     const session = await getServerSession(authOptions)
@@ -17,6 +17,9 @@ export async function GET(request) {
     const status = searchParams.get('status')
     const clientId = searchParams.get('clientId')
     const search = searchParams.get('search')
+    const page = parseInt(searchParams.get('page')) || 1
+    const limit = parseInt(searchParams.get('limit')) || 10
+    const offset = (page - 1) * limit
     
     const where = {}
     if (status) where.status = status
@@ -29,22 +32,31 @@ export async function GET(request) {
       ]
     }
     
-    const orders = await Order.findAll({
+    const { count, rows } = await Order.findAndCountAll({
       where,
       include: [
-        { model: Client, attributes: ['id', 'name', 'phone'] },
+        { model: Client, attributes: ['id', 'name', 'phone', 'address'] },
         { 
           model: Image,
           as: 'images',
-          where: { targetType: 'order' },
           required: false,
           attributes: ['id', 'url', 'filename', 'sortOrder']
         }
       ],
       order: [['createdAt', 'DESC']],
+      limit,
+      offset,
     })
     
-    return NextResponse.json(orders)
+    return NextResponse.json({
+      data: rows,
+      pagination: {
+        total: count,
+        page,
+        limit,
+        totalPages: Math.ceil(count / limit),
+      }
+    })
   } catch (error) {
     console.error('GET Orders Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -61,7 +73,6 @@ export async function POST(request) {
     
     const body = await request.json()
     
-    // Преобразуем пустые строки в null для UUID полей
     const orderData = {
       title: body.title,
       description: body.description || null,
@@ -69,7 +80,7 @@ export async function POST(request) {
       priority: body.priority || 'medium',
       date: body.date || null,
       totalAmount: body.totalAmount || null,
-      clientId: body.clientId || null,  // <-- пустая строка → null
+      clientId: body.clientId || null,
       userId: session.user.id,
     }
     
@@ -81,7 +92,6 @@ export async function POST(request) {
         { 
           model: Image,
           as: 'images',
-          where: { targetType: 'order' },
           required: false
         }
       ],

@@ -19,8 +19,7 @@ export async function GET(request, { params }) {
         { model: Client },
         { 
           model: Image,
-          as: 'images',  // <-- исправлено: 'images'
-          where: { targetType: 'order' },
+          as: 'images',  // <-- Убедись что алиас правильный
           required: false,
           attributes: ['id', 'url', 'filename', 'sortOrder']
         }
@@ -31,7 +30,10 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
     
-    return NextResponse.json(order)
+    // Преобразуем в plain объект и логируем
+    const orderData = order.get({ plain: true })
+    
+    return NextResponse.json(orderData)
   } catch (error) {
     console.error('GET Order Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -61,9 +63,9 @@ export async function PUT(request, { params }) {
         { model: Client },
         { 
           model: Image,
-          as: 'images',  // <-- исправлено: 'images'
-          where: { targetType: 'order' },
-          required: false
+          as: 'images',
+          required: false,
+          attributes: ['id', 'url', 'filename', 'sortOrder']
         }
       ],
     })
@@ -90,7 +92,6 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
     
-    // Удаляем связанные изображения
     await Image.destroy({
       where: {
         targetId: id,

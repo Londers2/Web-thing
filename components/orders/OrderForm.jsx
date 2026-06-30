@@ -9,20 +9,45 @@ export default function OrderForm({ order = null, isEdit = false }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [clients, setClients] = useState([])
+  const [orderId, setOrderId] = useState(order?.id || null)
+  const [images, setImages] = useState([])
   const [formData, setFormData] = useState({
-    title: order?.title || '',
-    description: order?.description || '',
-    status: order?.status || 'new',
-    priority: order?.priority || 'medium',
-    date: order?.date ? new Date(order.date).toISOString().split('T')[0] : '',
-    totalAmount: order?.totalAmount || '',
-    clientId: order?.clientId || '',  // <-- пустая строка вместо null
-    images: order?.images || [],
+    title: '',
+    description: '',
+    status: 'new',
+    priority: 'medium',
+    date: '',
+    totalAmount: '',
+    clientId: '',
   })
   
   useEffect(() => {
     fetchClients()
-  }, [])
+    
+    if (order) {
+      setFormData({
+        title: order.title || '',
+        description: order.description || '',
+        status: order.status || 'new',
+        priority: order.priority || 'medium',
+        date: order.date ? new Date(order.date).toISOString().split('T')[0] : '',
+        totalAmount: order.totalAmount || '',
+        clientId: order.clientId || '',
+      })
+      
+      if (order.images && order.images.length > 0) {
+        const formattedImages = order.images.map(img => {
+          if (typeof img === 'string') {
+            return { url: img, filename: 'Изображение' }
+          }
+          return img
+        })
+        setImages(formattedImages)
+      } else {
+        console.log('❌ No images found')
+      }
+    }
+  }, [order])
   
   const fetchClients = async () => {
     try {
@@ -43,8 +68,8 @@ export default function OrderForm({ order = null, isEdit = false }) {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
   
-  const handleImagesChange = (images) => {
-    setFormData(prev => ({ ...prev, images }))
+  const handleImagesChange = (newImages) => {
+    setImages(newImages)
   }
   
   const handleSubmit = async (e) => {
@@ -52,10 +77,9 @@ export default function OrderForm({ order = null, isEdit = false }) {
     setLoading(true)
     
     try {
-      // Подготовка данных: пустые строки → null
       const submitData = {
         ...formData,
-        clientId: formData.clientId || null,  // <-- пустая строка → null
+        clientId: formData.clientId || null,
         totalAmount: formData.totalAmount || null,
         date: formData.date || null,
       }
@@ -75,6 +99,21 @@ export default function OrderForm({ order = null, isEdit = false }) {
       }
       
       const data = await res.json()
+      
+      // Если это новый заказ, обновляем orderId для загрузки изображений
+      if (!isEdit && !orderId) {
+        setOrderId(data.id)
+        // Если есть изображения, загружаем их
+        if (images.length > 0) {
+          // Обновляем заказ с изображениями
+          await fetch(`/api/orders/${data.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ images: images.map(img => img.url || img) }),
+          })
+        }
+      }
+      
       router.push(`/order/${data.id}`)
     } catch (error) {
       console.error('Submit error:', error)
@@ -183,12 +222,14 @@ export default function OrderForm({ order = null, isEdit = false }) {
         />
       </div>
       
+      {/* Загрузка изображений */}
       <div>
         <label className="block text-sm font-medium mb-1">Изображения</label>
         <ImageUpload
-          images={formData.images}
+          images={images}
           onImagesChange={handleImagesChange}
-          targetId={order?.id}
+          targetId={orderId || order?.id}
+          targetType="order"
         />
       </div>
       
