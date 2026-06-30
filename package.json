@@ -9,15 +9,24 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@auth/sequelize-adapter": "^2.11.1",
     "@fullcalendar/core": "^6.1.20",
     "@fullcalendar/daygrid": "^6.1.20",
+    "@fullcalendar/interaction": "^6.1.20",
+    "@fullcalendar/list": "^6.1.20",
+    "@fullcalendar/multimonth": "^6.1.20",
     "@fullcalendar/react": "^6.1.20",
+    "@fullcalendar/timegrid": "^6.1.20",
     "@headlessui/react": "^2.2.10",
     "@heroicons/react": "^2.2.0",
     "heroicons": "^2.2.0",
     "next": "16.2.2",
+    "next-auth": "^4.24.13",
+    "pg": "^8.20.0",
+    "pg-hstore": "^2.3.4",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "sequelize": "^6.37.8"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
