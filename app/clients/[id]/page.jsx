@@ -3,6 +3,89 @@ import Sidebar from '@/components/sidebar'
 import { Client, Order } from '@/lib/db/index.js'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { 
+  PencilIcon,
+  PhoneIcon,
+  MapPinIcon,
+  DocumentTextIcon,
+  UserIcon,
+  ClockIcon,
+  ArrowPathIcon,
+  ShoppingBagIcon,
+  CurrencyDollarIcon,
+  CalendarIcon
+} from '@heroicons/react/24/outline'
+import { ChevronRightIcon } from '@heroicons/react/16/solid'
+
+// Компонент для форматирования телефона
+function FormattedPhone({ phone }) {
+  if (!phone) return null
+  
+  // Форматируем телефон
+  const formatPhone = (raw) => {
+    const cleaned = raw.replace(/\D/g, '')
+    const limited = cleaned.slice(0, 11)
+    if (limited.length === 0) return ''
+    
+    let result = '+7'
+    if (limited.length > 1) {
+      result += ' ('
+      const afterCode = limited.slice(1)
+      const firstThree = afterCode.slice(0, 3)
+      result += firstThree
+      if (afterCode.length >= 3) {
+        result += ') '
+        const nextThree = afterCode.slice(3, 6)
+        if (nextThree.length > 0) {
+          result += nextThree
+        }
+        const afterSix = afterCode.slice(6)
+        if (afterSix.length > 0) {
+          result += '-'
+          const firstTwo = afterSix.slice(0, 2)
+          result += firstTwo
+          if (afterSix.length > 2) {
+            result += '-'
+            const lastTwo = afterSix.slice(2, 4)
+            result += lastTwo
+          }
+        }
+      }
+    }
+    return result
+  }
+  
+  const formatted = formatPhone(phone)
+  if (!formatted) return null
+  
+  return (
+    <a 
+      href={`tel:${phone}`}
+      className="text-white font-medium hover:text-indigo-400 transition-colors flex items-center gap-2"
+    >
+      <PhoneIcon className="size-4 text-gray-400" />
+      {formatted}
+    </a>
+  )
+}
+
+// Компонент статуса заказа
+function OrderStatusBadge({ status }) {
+  const statusConfig = {
+    new: { label: 'Новый', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+    in_progress: { label: 'В работе', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
+    completed: { label: 'Выполнен', color: 'bg-green-500/10 text-green-400 border-green-500/20' },
+    cancelled: { label: 'Отменён', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
+  }
+  
+  const config = statusConfig[status] || statusConfig.new
+  
+  return (
+    <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${config.color}`}>
+      {config.label}
+    </span>
+  )
+}
 
 export default async function ClientPage({ params }) {
   const { id } = await params
@@ -14,7 +97,7 @@ export default async function ClientPage({ params }) {
         as: 'orders',
         limit: 10,
         order: [['createdAt', 'DESC']],
-        attributes: ['id', 'title', 'status', 'totalAmount', 'createdAt']
+        attributes: ['id', 'title', 'status', 'totalAmount', 'createdAt', 'date']
       }
     ]
   })
@@ -25,82 +108,171 @@ export default async function ClientPage({ params }) {
   
   const clientData = client.get({ plain: true })
   
-  const statusColors = {
-    new: 'bg-blue-100 text-blue-800',
-    in_progress: 'bg-yellow-100 text-yellow-800',
-    completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
-  }
-  
-  const statusLabels = {
-    new: 'Новый',
-    in_progress: 'В работе',
-    completed: 'Выполнен',
-    cancelled: 'Отменён',
-  }
-  
   return (
     <Sidebar>
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">{clientData.name}</h1>
-          <div className="flex gap-2">
-            <Link
-              href={`/clients/${clientData.id}/edit`}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              Редактировать
-            </Link>
+        {/* Хлебные крошки */}
+        <nav className="flex items-center gap-1 text-sm text-gray-400 mb-6">
+          <Link href="/clients" className="hover:text-indigo-400 transition-colors">
+            Клиенты
+          </Link>
+          <ChevronRightIcon className="size-4" />
+          <span className="text-white">{clientData.name}</span>
+        </nav>
+        
+        {/* Заголовок */}
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <div className="size-14 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+              <UserIcon className="size-7 text-indigo-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold text-white">
+                {clientData.name}
+              </h1>
+              <div className="mt-1">
+                <FormattedPhone phone={clientData.phone} />
+              </div>
+            </div>
           </div>
+          
+          <Link
+            href={`/clients/${clientData.id}/edit`}
+            className="inline-flex items-center gap-2 rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 transition-colors"
+          >
+            <PencilIcon className="size-4" />
+            Редактировать
+          </Link>
         </div>
         
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {clientData.phone && (
-              <div>
-                <label className="text-sm font-medium text-gray-500">Телефон</label>
-                <p className="font-medium">{clientData.phone}</p>
+        {/* Основная информация */}
+        <div className="space-y-6">
+          {/* Информационные карточки */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {clientData.address && (
+              <div className="rounded-xl bg-white/5 p-4">
+                <p className="text-sm text-gray-400">📍 Адрес</p>
+                <p className="text-white font-medium mt-1">{clientData.address}</p>
               </div>
             )}
             
-            {clientData.address && (
-              <div>
-                <label className="text-sm font-medium text-gray-500">Адрес</label>
-                <p className="font-medium">{clientData.address}</p>
+            {clientData.phone && (
+              <div className="rounded-xl bg-white/5 p-4">
+                <p className="text-sm text-gray-400">📞 Телефон</p>
+                <FormattedPhone phone={clientData.phone} />
+              </div>
+            )}
+            
+            {clientData.createdAt && (
+              <div className="rounded-xl bg-white/5 p-4">
+                <p className="text-sm text-gray-400">В системе с</p>
+                <p className="text-white font-medium mt-1 flex items-center gap-2">
+                  <ClockIcon className="size-4 text-gray-400" />
+                  {new Date(clientData.createdAt).toLocaleDateString('ru-RU', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </p>
+              </div>
+            )}
+            
+            {clientData.orders && clientData.orders.length > 0 && (
+              <div className="rounded-xl bg-white/5 p-4">
+                <p className="text-sm text-gray-400">Всего заказов</p>
+                <p className="text-2xl font-semibold text-white mt-1 flex items-center gap-2">
+                  <ShoppingBagIcon className="size-5 text-gray-400" />
+                  {clientData.orders.length}
+                </p>
+              </div>
+            )}
+            
+            {clientData.orders && clientData.orders.length > 0 && (
+              <div className="rounded-xl bg-white/5 p-4">
+                <p className="text-sm text-gray-400">Общая сумма заказов</p>
+                <p className="text-2xl font-semibold text-white mt-1 flex items-center gap-2">
+                  <CurrencyDollarIcon className="size-5 text-gray-400" />
+                  {clientData.orders
+                    .reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0)
+                    .toLocaleString()} ₽
+                </p>
+              </div>
+            )}
+            
+            {clientData.updatedAt && clientData.updatedAt !== clientData.createdAt && (
+              <div className="rounded-xl bg-white/5 p-4">
+                <p className="text-sm text-gray-400">Обновлён</p>
+                <p className="text-white font-medium mt-1 flex items-center gap-2">
+                  <ArrowPathIcon className="size-4 text-gray-400" />
+                  {new Date(clientData.updatedAt).toLocaleDateString('ru-RU', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </p>
               </div>
             )}
           </div>
           
+          {/* Заметки */}
           {clientData.notes && (
-            <div>
-              <label className="text-sm font-medium text-gray-500">Заметки</label>
-              <p className="mt-1 whitespace-pre-wrap bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
-                {clientData.notes}
-              </p>
+            <div className="rounded-xl bg-white/5 p-4">
+              <div className="flex items-start gap-3">
+                <DocumentTextIcon className="size-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm text-gray-400">Заметки</p>
+                  <p className="text-white mt-1 whitespace-pre-wrap">{clientData.notes}</p>
+                </div>
+              </div>
             </div>
           )}
           
+          {/* Заказы клиента */}
           {clientData.orders && clientData.orders.length > 0 && (
-            <div>
-              <label className="text-sm font-medium text-gray-500">Заказы</label>
-              <div className="mt-2 space-y-2">
+            <div className="rounded-xl bg-white/5 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <ShoppingBagIcon className="size-5 text-gray-400" />
+                  <p className="text-sm font-medium text-white">Последние заказы</p>
+                  <span className="text-xs text-gray-500">({clientData.orders.length})</span>
+                </div>
+                <Link 
+                  href={`/order?clientId=${clientData.id}`}
+                  className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                >
+                  Все заказы →
+                </Link>
+              </div>
+              
+              <div className="space-y-2">
                 {clientData.orders.map((order) => (
                   <Link
                     key={order.id}
                     href={`/order/${order.id}`}
-                    className="block p-3 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    className="block group"
                   >
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">{order.title}</span>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[order.status]}`}>
-                        {statusLabels[order.status] || order.status}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm text-gray-500 mt-1">
-                      <span>{new Date(order.createdAt).toLocaleDateString('ru-RU')}</span>
-                      {order.totalAmount && (
-                        <span>{Number(order.totalAmount).toLocaleString()} ₽</span>
-                      )}
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white group-hover:text-indigo-400 transition-colors">
+                          {order.title}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-gray-400">
+                          <OrderStatusBadge status={order.status} />
+                          {order.date && (
+                            <span className="flex items-center gap-1">
+                              <CalendarIcon className="size-3" />
+                              {new Date(order.date).toLocaleDateString('ru-RU')}
+                            </span>
+                          )}
+                          {order.totalAmount && (
+                            <span className="flex items-center gap-1">
+                              <CurrencyDollarIcon className="size-3" />
+                              {Number(order.totalAmount).toLocaleString()} ₽
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronRightIcon className="size-4 text-gray-500 group-hover:text-white transition-colors" />
                     </div>
                   </Link>
                 ))}

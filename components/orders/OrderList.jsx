@@ -5,8 +5,31 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import debounce from 'lodash/debounce'
 import Pagination from '@/components/Pagination'
+import { 
+  MagnifyingGlassIcon,
+  PlusIcon,
+  FunnelIcon,
+  MapPinIcon,
+  CurrencyDollarIcon,
+  ClockIcon,
+  UserIcon,
+  PhotoIcon
+} from '@heroicons/react/24/outline'
 
 const ITEMS_PER_PAGE = 5
+
+const statusConfig = {
+  new: { label: 'Новый', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+  in_progress: { label: 'В работе', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
+  completed: { label: 'Выполнен', color: 'bg-green-500/10 text-green-400 border-green-500/20' },
+  cancelled: { label: 'Отменён', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
+}
+
+const priorityConfig = {
+  low: { label: 'Низкий', color: 'text-gray-400' },
+  medium: { label: 'Средний', color: 'text-yellow-400' },
+  high: { label: 'Высокий', color: 'text-red-400' },
+}
 
 export default function OrderList() {
   const [orders, setOrders] = useState([])
@@ -24,7 +47,6 @@ export default function OrderList() {
   })
   const isFirstRender = useRef(true)
   
-  // Загружаем заказы при изменении фильтра, поиска или страницы
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false
@@ -73,7 +95,7 @@ export default function OrderList() {
   const debouncedSearch = useCallback(
     debounce((value) => {
       setSearch(value)
-      setCurrentPage(1) // Сбрасываем страницу при новом поиске
+      setCurrentPage(1)
     }, 500),
     []
   )
@@ -86,7 +108,7 @@ export default function OrderList() {
   
   const handleFilterChange = (e) => {
     setFilter(e.target.value)
-    setCurrentPage(1) // Сбрасываем страницу при смене фильтра
+    setCurrentPage(1)
   }
   
   const handleClearSearch = () => {
@@ -101,27 +123,6 @@ export default function OrderList() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   
-  const getStatusColor = (status) => {
-    const colors = {
-      new: 'bg-blue-100 text-blue-800',
-      in_progress: 'bg-yellow-100 text-yellow-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-    }
-    return colors[status] || 'bg-gray-100 text-gray-800'
-  }
-  
-  const getStatusLabel = (status) => {
-    const labels = {
-      new: 'Новый',
-      in_progress: 'В работе',
-      completed: 'Выполнен',
-      cancelled: 'Отменён',
-    }
-    return labels[status] || status
-  }
-  
-  // Отмена debounce при размонтировании
   useEffect(() => {
     return () => {
       debouncedSearch.cancel()
@@ -130,11 +131,11 @@ export default function OrderList() {
   
   if (error) {
     return (
-      <div className="text-center py-8">
-        <p className="text-red-600">Ошибка: {error}</p>
+      <div className="text-center py-12">
+        <p className="text-red-400">{error}</p>
         <button 
           onClick={fetchOrders}
-          className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="mt-4 rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-400"
         >
           Повторить попытку
         </button>
@@ -145,75 +146,87 @@ export default function OrderList() {
   return (
     <div>
       {/* Поиск и фильтры */}
-      <div className="flex flex-wrap gap-4 mb-6 sticky top-0 bg-gray-100 dark:bg-gray-950 py-4 z-10">
+      <div className="flex flex-wrap items-center gap-4 mb-8 sticky top-0 bg-gray-950 py-4 z-10">
         <div className="flex-1 min-w-[200px] relative">
-          <input
-            type="text"
-            placeholder="Поиск заказов..."
-            value={localSearch}
-            onChange={handleSearchChange}
-            className="w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-          {localSearch && (
-            <button
-              onClick={handleClearSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              ✕
-            </button>
-          )}
+          <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
+            <MagnifyingGlassIcon className="size-5 text-gray-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Поиск заказов..."
+              value={localSearch}
+              onChange={handleSearchChange}
+              className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white placeholder:text-gray-500 focus:outline-none sm:text-sm/6"
+            />
+            {localSearch && (
+              <button
+                onClick={handleClearSearch}
+                className="pr-3 text-gray-400 hover:text-white"
+              >
+                ✕
+              </button>
+            )}
+          </div>
           {search && localSearch && search !== localSearch && (
             <span className="absolute right-10 top-1/2 -translate-y-1/2">
-              <span className="inline-block w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></span>
+              <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></span>
             </span>
           )}
         </div>
         
-        <select
-          value={filter}
-          onChange={handleFilterChange}
-          className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">Все заказы</option>
-          <option value="new">Новые</option>
-          <option value="in_progress">В работе</option>
-          <option value="completed">Выполненные</option>
-          <option value="cancelled">Отменённые</option>
-        </select>
+        <div className="relative">
+          <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
+            <FunnelIcon className="size-5 text-gray-400 shrink-0 ml-1" />
+            <select
+              value={filter}
+              onChange={handleFilterChange}
+              className="w-full appearance-none bg-transparent py-1.5 pr-8 pl-2 text-base text-white focus:outline-none sm:text-sm/6"
+            >
+              <option value="all" className="bg-gray-800">Все заказы</option>
+              <option value="new" className="bg-gray-800">Новые</option>
+              <option value="in_progress" className="bg-gray-800">В работе</option>
+              <option value="completed" className="bg-gray-800">Выполненные</option>
+              <option value="cancelled" className="bg-gray-800">Отменённые</option>
+            </select>
+          </div>
+        </div>
         
         <Link
           href="/order/new"
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors whitespace-nowrap"
+          className="inline-flex items-center gap-2 rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 whitespace-nowrap"
         >
-          + Создать заказ
+          <PlusIcon className="size-4" />
+          Создать заказ
         </Link>
       </div>
       
       {/* Статус загрузки */}
       {loading && (
-        <div className="text-center py-8">
-          <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-2 text-gray-500">Загрузка заказов...</p>
+        <div className="text-center py-12">
+          <div className="inline-block w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-gray-400">Загрузка заказов...</p>
         </div>
       )}
       
       {/* Результаты */}
       {!loading && orders.length === 0 && (
-        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <p className="text-gray-500">
+        <div className="text-center py-12">
+          <div className="mx-auto size-12 rounded-full bg-white/5 flex items-center justify-center mb-4">
+            <PhotoIcon className="size-6 text-gray-400" />
+          </div>
+          <p className="text-gray-400">
             {search ? 'Заказов по вашему запросу не найдено' : 'Заказов пока нет'}
           </p>
           {search && (
             <button
               onClick={handleClearSearch}
-              className="mt-4 text-blue-600 hover:underline"
+              className="mt-4 text-indigo-400 hover:text-indigo-300"
             >
               Очистить поиск
             </button>
           )}
           {!search && (
-            <Link href="/order/new" className="mt-4 inline-block text-blue-600 hover:underline">
-              Создать первый заказ
+            <Link href="/order/new" className="mt-4 inline-block text-indigo-400 hover:text-indigo-300">
+              Создать первый заказ →
             </Link>
           )}
         </div>
@@ -221,84 +234,87 @@ export default function OrderList() {
       
       {/* Список заказов */}
       {!loading && orders.length > 0 && (
-        <div className="grid gap-4">
+        <div className="space-y-4">
           {orders.map((order) => (
             <div
               key={order.id}
-              className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow hover:shadow-md transition-shadow"
+              className="group relative rounded-xl bg-white/5 p-4 hover:bg-white/10 transition-colors"
             >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="flex-1">
-                  <Link href={`/order/${order.id}`}>
-                    <h3 className="text-lg font-semibold hover:text-blue-600 transition-colors">
-                      {order.title}
-                    </h3>
-                  </Link>
-                  
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                    {order.description || 'Нет описания'}
-                  </p>
-                  
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
-                      {getStatusLabel(order.status)}
+              <div className="flex flex-wrap items-start gap-4">
+                {/* Аватар/иконка заказа */}
+                <div className="flex-shrink-0">
+                  <div className="size-12 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                    {order.images && order.images.length > 0 ? (
+                      <img
+                        src={order.images[0].url}
+                        alt=""
+                        className="size-12 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <PhotoIcon className="size-6 text-indigo-400" />
+                    )}
+                  </div>
+                </div>
+                
+                {/* Основная информация */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href={`/order/${order.id}`}>
+                      <h3 className="text-base font-semibold text-white hover:text-indigo-400 transition-colors">
+                        {order.title}
+                      </h3>
+                    </Link>
+                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${statusConfig[order.status]?.color || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+                      {statusConfig[order.status]?.label || order.status}
                     </span>
-                    
-                    {order.priority === 'high' && (
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
-                        ⚠ Высокий приоритет
+                    <span className={`text-xs ${priorityConfig[order.priority]?.color || 'text-gray-400'}`}>
+                      {priorityConfig[order.priority]?.label || order.priority}
+                    </span>
+                  </div>
+                  
+                  {order.description && (
+                    <p className="mt-1 text-sm text-gray-400 line-clamp-2">
+                      {order.description}
+                    </p>
+                  )}
+                  
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-400">
+                    {order.address && (
+                      <span className="flex items-center gap-1">
+                        <MapPinIcon className="size-4" />
+                        {order.address}
                       </span>
                     )}
-                    {order.priority === 'low' && (
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                        Низкий приоритет
-                      </span>
-                    )}
-                    
                     {order.totalAmount && (
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                      <span className="flex items-center gap-1">
+                        <CurrencyDollarIcon className="size-4" />
                         {Number(order.totalAmount).toLocaleString()} ₽
                       </span>
                     )}
+                    {order.date && (
+                      <span className="flex items-center gap-1">
+                        <ClockIcon className="size-4" />
+                        {new Date(order.date).toLocaleDateString('ru-RU')}
+                      </span>
+                    )}
+                    {order.client && (
+                      <span className="flex items-center gap-1">
+                        <UserIcon className="size-4" />
+                        <Link href={`/clients/${order.client.id}`} className="hover:text-indigo-400 transition-colors">
+                          {order.client.name}
+                        </Link>
+                      </span>
+                    )}
                   </div>
-                  
-                  {order.client ? (
-                    <Link 
-                      href={`/clients/${order.client.id}`}
-                      className="inline-block mt-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                    >
-                      👤 {order.client.name}
-                      {order.client.phone && ` · ${order.client.phone}`}
-                    </Link>
-                  ) : (
-                    <p className="text-sm text-gray-400 mt-2">Без клиента</p>
-                  )}
-                  
-                  {order.images && order.images.length > 0 && (
-                    <div className="flex gap-1 mt-2">
-                      {order.images.slice(0, 3).map((img, idx) => (
-                        <img
-                          key={idx}
-                          src={img.url}
-                          alt=""
-                          className="w-8 h-8 rounded object-cover"
-                        />
-                      ))}
-                      {order.images.length > 3 && (
-                        <span className="text-xs text-gray-500">+{order.images.length - 3}</span>
-                      )}
-                    </div>
-                  )}
                 </div>
                 
-                <div className="flex gap-2">
-                  <Link
-                    href={`/order/${order.id}/edit`}
-                    className="px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded transition-colors"
-                  >
-                    Редактировать
-                  </Link>
-                </div>
+                {/* Кнопка редактирования */}
+                <Link
+                  href={`/order/${order.id}/edit`}
+                  className="flex-shrink-0 rounded-md bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20 transition-colors"
+                >
+                  Редактировать
+                </Link>
               </div>
             </div>
           ))}

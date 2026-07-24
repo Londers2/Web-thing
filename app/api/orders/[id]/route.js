@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { Order, Client, Image } from '@/lib/db/index.js'
+import { Order, Client, Image, OrderParticipant, User } from '@/lib/db/index.js'  // <-- Добавлен User
 
 // GET - получить один заказ
 export async function GET(request, { params }) {
@@ -19,9 +19,13 @@ export async function GET(request, { params }) {
         { model: Client },
         { 
           model: Image,
-          as: 'images',  // <-- Убедись что алиас правильный
+          as: 'images',
           required: false,
           attributes: ['id', 'url', 'filename', 'sortOrder']
+        },
+        {
+          model: OrderParticipant,
+          include: [{ model: User, attributes: ['id', 'name', 'email'] }]
         }
       ],
     })
@@ -30,10 +34,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
     
-    // Преобразуем в plain объект и логируем
-    const orderData = order.get({ plain: true })
-    
-    return NextResponse.json(orderData)
+    return NextResponse.json(order)
   } catch (error) {
     console.error('GET Order Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -56,7 +57,35 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
     
-    await order.update(body)
+    // Обновляем заказ
+    await order.update({
+      title: body.title,
+      description: body.description || null,
+      address: body.address || null,
+      status: body.status || 'new',
+      priority: body.priority || 'medium',
+      date: body.date || null,
+      deliveryDate: body.deliveryDate || null,
+      assemblyDate: body.assemblyDate || null,
+      totalAmount: body.totalAmount || null,
+      clientId: body.clientId || null,
+    })
+    
+    // Обновляем участников
+    if (body.participants) {
+      // Удаляем старых участников
+      await OrderParticipant.destroy({ where: { orderId: id } })
+      
+      // Добавляем новых
+      if (body.participants.length > 0) {
+        const participants = body.participants.map(p => ({
+          orderId: id,
+          userId: p.userId,
+          role: p.role,
+        }))
+        await OrderParticipant.bulkCreate(participants)
+      }
+    }
     
     const updatedOrder = await Order.findByPk(id, {
       include: [
@@ -64,8 +93,11 @@ export async function PUT(request, { params }) {
         { 
           model: Image,
           as: 'images',
-          required: false,
-          attributes: ['id', 'url', 'filename', 'sortOrder']
+          required: false
+        },
+        {
+          model: OrderParticipant,
+          include: [{ model: User, attributes: ['id', 'name', 'email'] }]
         }
       ],
     })
@@ -92,6 +124,8 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
     
+    // Удаляем связанные данные
+    await OrderParticipant.destroy({ where: { orderId: id } })
     await Image.destroy({
       where: {
         targetId: id,

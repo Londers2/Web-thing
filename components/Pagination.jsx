@@ -2,6 +2,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/16/solid'
 
 export default function Pagination({ 
   currentPage, 
@@ -40,14 +41,14 @@ export default function Pagination({
   if (totalPages <= 1) return null
   
   return (
-    <div className="flex flex-col items-center gap-4 mt-6">
-      <div className="flex items-center gap-2">
+    <div className="flex flex-col items-center gap-4 mt-8 pt-4 border-t border-white/10">
+      <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="px-3 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="rounded-md px-2 py-1 text-sm text-gray-400 hover:bg-white/5 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
         >
-          ←
+          <ChevronLeftIcon className="size-5" />
         </button>
         
         {pages.map((page, index) => (
@@ -57,10 +58,10 @@ export default function Pagination({
             <button
               key={page}
               onClick={() => onPageChange(page)}
-              className={`px-3 py-1 rounded transition-colors ${
+              className={`min-w-[2rem] rounded-md px-2 py-1 text-sm transition-colors ${
                 currentPage === page
-                  ? 'bg-blue-600 text-white'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-700 border'
+                  ? 'bg-indigo-500 text-white'
+                  : 'text-gray-400 hover:bg-white/5 hover:text-white'
               }`}
             >
               {page}
@@ -71,13 +72,13 @@ export default function Pagination({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="px-3 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="rounded-md px-2 py-1 text-sm text-gray-400 hover:bg-white/5 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
         >
-          →
+          <ChevronRightIcon className="size-5" />
         </button>
       </div>
       
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-400">
         Показано {((currentPage - 1) * itemsPerPage) + 1}-
         {Math.min(currentPage * itemsPerPage, totalItems)} из {totalItems} заказов
       </div>

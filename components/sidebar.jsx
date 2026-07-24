@@ -38,6 +38,8 @@ export default function Sidebar({children}) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { data: session } = useSession()
 
+  console.log(session)
+
   return (
     <>
       <div>

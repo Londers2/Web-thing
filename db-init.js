@@ -1,4 +1,5 @@
-import { testConnection, syncDatabase } from '@/lib/db/index.js'
+// db-init.js
+import { testConnection, syncDatabase } from './lib/db/index.js'
 
 async function initDatabase() {
   console.log('Initializing database...')
@@ -11,8 +12,7 @@ async function initDatabase() {
   
   await syncDatabase({ alter: true })
   console.log('Database initialization complete')
+  process.exit(0)
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  initDatabase()
-}
+initDatabase()

@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { Order, Client, Image } from '@/lib/db/index.js'
+import { Order, Client, Image, OrderParticipant, User } from '@/lib/db/index.js'  // <-- Добавлен User
 import { Op } from 'sequelize'
 
 // GET - список заказов с фильтрацией и пагинацией
@@ -29,6 +29,7 @@ export async function GET(request) {
       where[Op.or] = [
         { title: { [Op.iLike]: `%${search}%` } },
         { description: { [Op.iLike]: `%${search}%` } },
+        { address: { [Op.iLike]: `%${search}%` } },
       ]
     }
     
@@ -41,6 +42,10 @@ export async function GET(request) {
           as: 'images',
           required: false,
           attributes: ['id', 'url', 'filename', 'sortOrder']
+        },
+        {
+          model: OrderParticipant,
+          include: [{ model: User, attributes: ['id', 'name', 'email'] }]
         }
       ],
       order: [['createdAt', 'DESC']],
@@ -76,9 +81,12 @@ export async function POST(request) {
     const orderData = {
       title: body.title,
       description: body.description || null,
+      address: body.address || null,
       status: body.status || 'new',
       priority: body.priority || 'medium',
       date: body.date || null,
+      deliveryDate: body.deliveryDate || null,
+      assemblyDate: body.assemblyDate || null,
       totalAmount: body.totalAmount || null,
       clientId: body.clientId || null,
       userId: session.user.id,
@@ -86,6 +94,17 @@ export async function POST(request) {
     
     const order = await Order.create(orderData)
     
+    // Добавляем участников
+    if (body.participants && body.participants.length > 0) {
+      const participants = body.participants.map(p => ({
+        orderId: order.id,
+        userId: p.userId,
+        role: p.role,
+      }))
+      await OrderParticipant.bulkCreate(participants)
+    }
+    
+    // Загружаем заказ с отношениями
     const orderWithRelations = await Order.findByPk(order.id, {
       include: [
         { model: Client },
@@ -93,6 +112,10 @@ export async function POST(request) {
           model: Image,
           as: 'images',
           required: false
+        },
+        {
+          model: OrderParticipant,
+          include: [{ model: User, attributes: ['id', 'name', 'email'] }]
         }
       ],
     })
