@@ -18,7 +18,8 @@ import {
   TruckIcon,
   WrenchScrewdriverIcon,
   BriefcaseIcon,
-  CalendarDaysIcon
+  CalendarDaysIcon,
+  InformationCircleIcon
 } from '@heroicons/react/24/outline'
 import { ChevronRightIcon } from '@heroicons/react/16/solid'
 import MapButtons from '@/components/MapButtons'
@@ -108,31 +109,31 @@ function PriorityBadge({ priority }) {
 // Компонент для отображения участников
 function ParticipantsSection({ participants }) {
   if (!participants || participants.length === 0) return null
-
+  
   const roleConfig = {
-    manager: {
-      label: 'Менеджер',
+    manager: { 
+      label: 'Менеджер', 
       icon: BriefcaseIcon,
       bgColor: 'bg-blue-500/10',
       textColor: 'text-blue-400',
       borderColor: 'border-blue-500/20'
     },
-    measurer: {
-      label: 'Замерщик',
+    measurer: { 
+      label: 'Замерщик', 
       icon: WrenchScrewdriverIcon,
       bgColor: 'bg-yellow-500/10',
       textColor: 'text-yellow-400',
       borderColor: 'border-yellow-500/20'
     },
-    assembler: {
-      label: 'Сборщик',
+    assembler: { 
+      label: 'Сборщик', 
       icon: TruckIcon,
       bgColor: 'bg-green-500/10',
       textColor: 'text-green-400',
       borderColor: 'border-green-500/20'
     }
   }
-
+  
   // Группируем участников по ролям
   const grouped = participants.reduce((acc, p) => {
     const role = p.role
@@ -140,20 +141,20 @@ function ParticipantsSection({ participants }) {
     acc[role].push(p)
     return acc
   }, {})
-
+  
   return (
     <div className="rounded-xl bg-white/5 p-4">
       <div className="flex items-center gap-2 mb-4">
         <UserGroupIcon className="size-5 text-gray-400" />
         <p className="text-sm font-medium text-white">Участники заказа</p>
       </div>
-
+      
       <div className="space-y-3">
         {Object.entries(grouped).map(([role, users]) => {
           const config = roleConfig[role]
           if (!config) return null
           const Icon = config.icon
-
+          
           return (
             <div key={role} className="flex flex-wrap items-center gap-2">
               {/* Бейдж роли */}
@@ -166,15 +167,28 @@ function ParticipantsSection({ participants }) {
                   {users.length}
                 </span>
               </div>
-
-              {/* Список пользователей */}
+              
+              {/* Список пользователей с аватарами */}
               <div className="flex flex-wrap gap-1.5">
                 {users.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+                  <div 
+                    key={p.id} 
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
                   >
-                    <UserIcon className="size-3 text-gray-400" />
+                    {/* Аватар пользователя */}
+                    {p.user?.image ? (
+                      <img
+                        src={p.user.image}
+                        alt={p.user.name || 'Пользователь'}
+                        className="size-5 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="size-5 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                        <span className="text-[10px] font-medium text-indigo-400">
+                          {(p.user?.name || 'П')[0].toUpperCase()}
+                        </span>
+                      </div>
+                    )}
                     <span className="text-sm text-white">
                       {p.user?.name || 'Пользователь'}
                     </span>
@@ -191,11 +205,11 @@ function ParticipantsSection({ participants }) {
 
 export default async function OrderPage({ params }) {
   const { id } = await params
-
+  
   const order = await Order.findByPk(id, {
     include: [
       { model: Client },
-      {
+      { 
         model: Image,
         as: 'images',
         required: false,
@@ -203,17 +217,17 @@ export default async function OrderPage({ params }) {
       },
       {
         model: OrderParticipant,
-        include: [{ model: User, attributes: ['id', 'name', 'email'] }]
+        include: [{ model: User, attributes: ['id', 'name', 'email', 'image'] }]
       }
     ],
   })
-
+  
   if (!order) {
     notFound()
   }
-
+  
   const orderData = order.get({ plain: true })
-
+  
   return (
     <Sidebar>
       <div className="max-w-4xl mx-auto">
@@ -225,7 +239,7 @@ export default async function OrderPage({ params }) {
           <ChevronRightIcon className="size-4" />
           <span className="text-white">{orderData.title}</span>
         </nav>
-
+        
         {/* Заголовок */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
@@ -235,15 +249,9 @@ export default async function OrderPage({ params }) {
             <div className="flex flex-wrap items-center gap-3 mt-2">
               <StatusBadge status={orderData.status} />
               <PriorityBadge priority={orderData.priority} />
-              {orderData.date && (
-                <span className="flex items-center gap-1 text-sm text-gray-400">
-                  <CalendarIcon className="size-4" />
-                  {new Date(orderData.date).toLocaleDateString('ru-RU')}
-                </span>
-              )}
             </div>
           </div>
-
+          
           <Link
             href={`/order/${orderData.id}/edit`}
             className="inline-flex items-center gap-2 rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 transition-colors"
@@ -252,10 +260,10 @@ export default async function OrderPage({ params }) {
             Редактировать
           </Link>
         </div>
-
+        
         {/* Основная информация */}
         <div className="space-y-6">
-          {/* Информационные карточки */}
+          {/* Блок с суммарной информацией */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {orderData.totalAmount && (
               <div className="rounded-xl bg-white/5 p-4">
@@ -265,11 +273,11 @@ export default async function OrderPage({ params }) {
                 </p>
               </div>
             )}
-
+            
             {orderData.client && (
               <div className="rounded-xl bg-white/5 p-4">
                 <p className="text-sm text-gray-400">Клиент</p>
-                <Link
+                <Link 
                   href={`/clients/${orderData.client.id}`}
                   className="text-white hover:text-indigo-400 transition-colors flex items-center gap-2 mt-1"
                 >
@@ -283,94 +291,76 @@ export default async function OrderPage({ params }) {
                 )}
               </div>
             )}
-
-            {orderData.date && (
-              <div className="rounded-xl bg-white/5 p-4">
-                <p className="text-sm text-gray-400">Дата выполнения</p>
-                <p className="text-white font-medium mt-1 flex items-center gap-2">
-                  <CalendarIcon className="size-4 text-gray-400" />
-                  {new Date(orderData.date).toLocaleDateString('ru-RU', {
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </p>
-              </div>
-            )}
-
-            {orderData.deliveryDate && (
-              <div className="rounded-xl bg-white/5 p-4">
-                <p className="text-sm text-gray-400">🚚 Дата доставки</p>
-                <p className="text-white font-medium mt-1 flex items-center gap-2">
-                  <CalendarDaysIcon className="size-4 text-gray-400" />
-                  {new Date(orderData.deliveryDate).toLocaleDateString('ru-RU', {
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </p>
-              </div>
-            )}
-
-            {orderData.assemblyDate && (
-              <div className="rounded-xl bg-white/5 p-4">
-                <p className="text-sm text-gray-400">🔧 Дата сборки</p>
-                <p className="text-white font-medium mt-1 flex items-center gap-2">
-                  <WrenchScrewdriverIcon className="size-4 text-gray-400" />
-                  {new Date(orderData.assemblyDate).toLocaleDateString('ru-RU', {
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </p>
-              </div>
-            )}
-
-            {orderData.createdAt && (
-              <div className="rounded-xl bg-white/5 p-4">
-                <p className="text-sm text-gray-400">Создан</p>
-                <p className="text-white font-medium mt-1 flex items-center gap-2">
-                  <ClockIcon className="size-4 text-gray-400" />
-                  {new Date(orderData.createdAt).toLocaleDateString('ru-RU', {
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </p>
-              </div>
-            )}
-
-            {orderData.updatedAt && orderData.updatedAt !== orderData.createdAt && (
-              <div className="rounded-xl bg-white/5 p-4">
-                <p className="text-sm text-gray-400">Обновлён</p>
-                <p className="text-white font-medium mt-1 flex items-center gap-2">
-                  <ArrowPathIcon className="size-4 text-gray-400" />
-                  {new Date(orderData.updatedAt).toLocaleDateString('ru-RU', {
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </p>
-              </div>
-            )}
           </div>
-
+          
+          {/* Блок с датами */}
+          <div className="rounded-xl bg-white/5 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarDaysIcon className="size-5 text-gray-400" />
+              <p className="text-sm font-medium text-white">Даты заказа</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {orderData.date && (
+                <div>
+                  <p className="text-sm text-gray-400">Выполнение</p>
+                  <p className="text-white font-medium mt-1 flex items-center gap-2">
+                    <CalendarIcon className="size-4 text-gray-400" />
+                    {new Date(orderData.date).toLocaleDateString('ru-RU', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </p>
+                </div>
+              )}
+              {orderData.deliveryDate && (
+                <div>
+                  <p className="text-sm text-gray-400">Доставка</p>
+                  <p className="text-white font-medium mt-1 flex items-center gap-2">
+                    <TruckIcon className="size-4 text-gray-400" />
+                    {new Date(orderData.deliveryDate).toLocaleDateString('ru-RU', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </p>
+                </div>
+              )}
+              {orderData.assemblyDate && (
+                <div>
+                  <p className="text-sm text-gray-400">Сборка</p>
+                  <p className="text-white font-medium mt-1 flex items-center gap-2">
+                    <WrenchScrewdriverIcon className="size-4 text-gray-400" />
+                    {new Date(orderData.assemblyDate).toLocaleDateString('ru-RU', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+          
           {/* Участники заказа */}
           <ParticipantsSection participants={orderData.order_participants || []} />
-
+          
           {/* Адрес с кнопками карт */}
           {orderData.address && (
             <div className="rounded-xl bg-white/5 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm text-gray-400">📍 Адрес выполнения</p>
+                  <div className="flex gap-3 text-sm text-gray-400">
+                    <MapPinIcon className="size-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <p>Адрес выполнения</p>
+                  </div>
                   <p className="text-white font-medium mt-1">{orderData.address}</p>
                 </div>
                 <MapButtons address={orderData.address} />
               </div>
             </div>
           )}
-
+          
           {/* Описание */}
           {orderData.description && (
             <div className="rounded-xl bg-white/5 p-4">
@@ -383,7 +373,7 @@ export default async function OrderPage({ params }) {
               </div>
             </div>
           )}
-
+          
           {/* Изображения */}
           {orderData.images && orderData.images.length > 0 && (
             <div className="rounded-xl bg-white/5 p-4">
@@ -412,6 +402,34 @@ export default async function OrderPage({ params }) {
               </div>
             </div>
           )}
+          
+          {/* Мета-информация: создан, обновлён */}
+          <div className="rounded-xl bg-white/5 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <InformationCircleIcon className="size-5 text-gray-400" />
+              <p className="text-sm font-medium text-white">Информация о заказе</p>
+            </div>
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-400">
+              <span className="flex items-center gap-1.5">
+                <ClockIcon className="size-4" />
+                Создан: {new Date(orderData.createdAt).toLocaleDateString('ru-RU', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric'
+                })}
+              </span>
+              {orderData.updatedAt && orderData.updatedAt !== orderData.createdAt && (
+                <span className="flex items-center gap-1.5">
+                  <ArrowPathIcon className="size-4" />
+                  Обновлён: {new Date(orderData.updatedAt).toLocaleDateString('ru-RU', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </Sidebar>

@@ -1,7 +1,7 @@
 // components/orders/OrderList.jsx
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import debounce from 'lodash/debounce'
 import Pagination from '@/components/Pagination'
@@ -11,12 +11,22 @@ import {
   FunnelIcon,
   MapPinIcon,
   CurrencyDollarIcon,
-  ClockIcon,
+  CalendarIcon,
   UserIcon,
-  PhotoIcon
+  PhotoIcon,
+  TrashIcon,
+  PencilIcon,
+  UserGroupIcon,
+  WrenchScrewdriverIcon,
+  TruckIcon,
+  TagIcon,
+  DocumentTextIcon,
+  InformationCircleIcon,
+  PhoneIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline'
 
-const ITEMS_PER_PAGE = 5
+const ITEMS_PER_PAGE = 10
 
 const statusConfig = {
   new: { label: 'Новый', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
@@ -31,42 +41,92 @@ const priorityConfig = {
   high: { label: 'Высокий', color: 'text-red-400' },
 }
 
+const roleColors = {
+  manager: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  measurer: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  assembler: 'bg-green-500/10 text-green-400 border-green-500/20'
+}
+
+// Компонент для форматирования телефона
+function FormattedPhone({ phone }) {
+  if (!phone) return null
+  
+  const formatPhone = (raw) => {
+    const cleaned = raw.replace(/\D/g, '')
+    const limited = cleaned.slice(0, 11)
+    if (limited.length === 0) return ''
+    
+    let result = '+7'
+    if (limited.length > 1) {
+      result += ' ('
+      const afterCode = limited.slice(1)
+      const firstThree = afterCode.slice(0, 3)
+      result += firstThree
+      if (afterCode.length >= 3) {
+        result += ') '
+        const nextThree = afterCode.slice(3, 6)
+        if (nextThree.length > 0) {
+          result += nextThree
+        }
+        const afterSix = afterCode.slice(6)
+        if (afterSix.length > 0) {
+          result += '-'
+          const firstTwo = afterSix.slice(0, 2)
+          result += firstTwo
+          if (afterSix.length > 2) {
+            result += '-'
+            const lastTwo = afterSix.slice(2, 4)
+            result += lastTwo
+          }
+        }
+      }
+    }
+    return result
+  }
+  
+  const formatted = formatPhone(phone)
+  if (!formatted) return null
+  
+  return (
+    <a 
+      href={`tel:${phone}`}
+      className="hover:text-indigo-400 transition-colors flex items-center gap-1"
+    >
+      <PhoneIcon className="size-3.5" />
+      {formatted}
+    </a>
+  )
+}
+
+function SearchInfo() {
+  return (
+    <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+      <InformationCircleIcon className="size-3.5" />
+      <span>Поиск по: названию, описанию, адресу, клиенту, телефону, участникам</span>
+    </div>
+  )
+}
+
 export default function OrderList() {
-  const [orders, setOrders] = useState([])
+  const [allOrders, setAllOrders] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [localSearch, setLocalSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [pagination, setPagination] = useState({
-    total: 0,
-    page: 1,
-    limit: ITEMS_PER_PAGE,
-    totalPages: 0
-  })
-  const isFirstRender = useRef(true)
   
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false
-      fetchOrders()
-      return
-    }
-    
-    fetchOrders()
-  }, [filter, search, currentPage])
+    fetchAllOrders()
+  }, [filter])
   
-  const fetchOrders = async () => {
+  const fetchAllOrders = async () => {
     try {
       setLoading(true)
       setError(null)
       
       const params = new URLSearchParams()
       if (filter !== 'all') params.append('status', filter)
-      if (search.trim()) params.append('search', search.trim())
-      params.append('page', currentPage)
-      params.append('limit', ITEMS_PER_PAGE)
       
       const res = await fetch(`/api/orders?${params}`)
       
@@ -76,26 +136,55 @@ export default function OrderList() {
       }
       
       const data = await res.json()
-      setOrders(data.data || [])
-      setPagination(data.pagination || {
-        total: 0,
-        page: 1,
-        limit: ITEMS_PER_PAGE,
-        totalPages: 0
-      })
+      setAllOrders(data.data || [])
     } catch (error) {
       console.error('Error fetching orders:', error)
       setError(error.message || 'Ошибка загрузки заказов')
-      setOrders([])
+      setAllOrders([])
     } finally {
       setLoading(false)
     }
   }
   
+  const filteredOrders = useMemo(() => {
+    if (!search.trim()) return allOrders
+    
+    const searchLower = search.trim().toLowerCase()
+    
+    return allOrders.filter(order => {
+      if (order.title?.toLowerCase().includes(searchLower)) return true
+      if (order.description?.toLowerCase().includes(searchLower)) return true
+      if (order.address?.toLowerCase().includes(searchLower)) return true
+      
+      if (order.client) {
+        if (order.client.name?.toLowerCase().includes(searchLower)) return true
+        if (order.client.phone?.includes(search.trim())) return true
+      }
+      
+      if (order.order_participants) {
+        for (const p of order.order_participants) {
+          if (p.user?.name?.toLowerCase().includes(searchLower)) return true
+        }
+      }
+      
+      return false
+    })
+  }, [allOrders, search])
+  
+  const totalCount = filteredOrders.length
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE) || 1
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
+  
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search])
+  
   const debouncedSearch = useCallback(
     debounce((value) => {
       setSearch(value)
-      setCurrentPage(1)
     }, 500),
     []
   )
@@ -106,21 +195,40 @@ export default function OrderList() {
     debouncedSearch(value)
   }
   
+  const handleClearSearch = () => {
+    setLocalSearch('')
+    setSearch('')
+    debouncedSearch.cancel()
+  }
+  
   const handleFilterChange = (e) => {
     setFilter(e.target.value)
     setCurrentPage(1)
   }
   
-  const handleClearSearch = () => {
-    setLocalSearch('')
-    setSearch('')
-    setCurrentPage(1)
-    debouncedSearch.cancel()
-  }
-  
   const handlePageChange = (page) => {
     setCurrentPage(page)
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  
+  const handleDelete = async (id, title) => {
+    if (!confirm(`Удалить заказ "${title}"?`)) return
+    
+    try {
+      const res = await fetch(`/api/orders/${id}`, {
+        method: 'DELETE',
+      })
+      
+      if (res.ok) {
+        await fetchAllOrders()
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Ошибка при удалении заказа')
+      }
+    } catch (error) {
+      console.error('Delete error:', error)
+      alert('Ошибка при удалении заказа')
+    }
   }
   
   useEffect(() => {
@@ -134,7 +242,7 @@ export default function OrderList() {
       <div className="text-center py-12">
         <p className="text-red-400">{error}</p>
         <button 
-          onClick={fetchOrders}
+          onClick={fetchAllOrders}
           className="mt-4 rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-400"
         >
           Повторить попытку
@@ -146,13 +254,13 @@ export default function OrderList() {
   return (
     <div>
       {/* Поиск и фильтры */}
-      <div className="flex flex-wrap items-center gap-4 mb-8 sticky top-0 bg-gray-950 py-4 z-10">
-        <div className="flex-1 min-w-[200px] relative">
+      <div className="flex flex-wrap items-start gap-4 mb-8 sticky top-0 bg-gray-950 py-4 z-10">
+        <div className="flex-1 min-w-[200px]">
           <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
             <MagnifyingGlassIcon className="size-5 text-gray-400 shrink-0" />
             <input
               type="text"
-              placeholder="Поиск заказов..."
+              placeholder="Поиск по названию, клиенту, адресу..."
               value={localSearch}
               onChange={handleSearchChange}
               className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white placeholder:text-gray-500 focus:outline-none sm:text-sm/6"
@@ -166,11 +274,7 @@ export default function OrderList() {
               </button>
             )}
           </div>
-          {search && localSearch && search !== localSearch && (
-            <span className="absolute right-10 top-1/2 -translate-y-1/2">
-              <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></span>
-            </span>
-          )}
+          <SearchInfo />
         </div>
         
         <div className="relative">
@@ -208,7 +312,7 @@ export default function OrderList() {
       )}
       
       {/* Результаты */}
-      {!loading && orders.length === 0 && (
+      {!loading && filteredOrders.length === 0 && (
         <div className="text-center py-12">
           <div className="mx-auto size-12 rounded-full bg-white/5 flex items-center justify-center mb-4">
             <PhotoIcon className="size-6 text-gray-400" />
@@ -233,98 +337,151 @@ export default function OrderList() {
       )}
       
       {/* Список заказов */}
-      {!loading && orders.length > 0 && (
+      {!loading && filteredOrders.length > 0 && (
         <div className="space-y-4">
-          {orders.map((order) => (
+          {paginatedOrders.map((order) => (
             <div
               key={order.id}
-              className="group relative rounded-xl bg-white/5 p-4 hover:bg-white/10 transition-colors"
+              className="group relative rounded-xl bg-white/5 p-5 hover:bg-white/10 transition-colors"
             >
-              <div className="flex flex-wrap items-start gap-4">
-                {/* Аватар/иконка заказа */}
-                <div className="flex-shrink-0">
-                  <div className="size-12 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                    {order.images && order.images.length > 0 ? (
-                      <img
-                        src={order.images[0].url}
-                        alt=""
-                        className="size-12 rounded-lg object-cover"
-                      />
-                    ) : (
-                      <PhotoIcon className="size-6 text-indigo-400" />
-                    )}
-                  </div>
+              {/* Заголовок и статусы */}
+              <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link href={`/order/${order.id}`}>
+                    <h3 className="text-base font-semibold text-white hover:text-indigo-400 transition-colors">
+                      {order.title}
+                    </h3>
+                  </Link>
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${statusConfig[order.status]?.color || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+                    {statusConfig[order.status]?.label || order.status}
+                  </span>
+                  <span className={`text-xs ${priorityConfig[order.priority]?.color || 'text-gray-400'}`}>
+                    {priorityConfig[order.priority]?.label || order.priority}
+                  </span>
                 </div>
                 
-                {/* Основная информация */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link href={`/order/${order.id}`}>
-                      <h3 className="text-base font-semibold text-white hover:text-indigo-400 transition-colors">
-                        {order.title}
-                      </h3>
+                <div className="flex gap-2">
+                  <Link
+                    href={`/order/${order.id}/edit`}
+                    className="rounded-md bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20 transition-colors"
+                  >
+                    <PencilIcon className="size-4" />
+                  </Link>
+                  <button
+                    onClick={() => handleDelete(order.id, order.title)}
+                    className="rounded-md bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+                  >
+                    <TrashIcon className="size-4" />
+                  </button>
+                </div>
+              </div>
+              
+              {/* Описание */}
+              {order.description && (
+                <div className="mb-3 text-sm text-gray-400 line-clamp-2">
+                  <DocumentTextIcon className="size-3.5 inline mr-1" />
+                  {order.description}
+                </div>
+              )}
+              
+              {/* Разделитель */}
+              <div className="border-t border-white/5 my-3" />
+              
+              {/* Блок с датами */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
+                <div className="flex items-center gap-1.5 text-sm text-gray-400">
+                  <CalendarIcon className="size-4" />
+                  <span>Выполнение: {order.date ? new Date(order.date).toLocaleDateString('ru-RU') : '—'}</span>
+                </div>
+                {order.assemblyDate && (
+                  <div className="flex items-center gap-1.5 text-sm text-yellow-400/80">
+                    <WrenchScrewdriverIcon className="size-4" />
+                    <span>Сборка: {new Date(order.assemblyDate).toLocaleDateString('ru-RU')}</span>
+                  </div>
+                )}
+                {order.deliveryDate && (
+                  <div className="flex items-center gap-1.5 text-sm text-green-400/80">
+                    <TruckIcon className="size-4" />
+                    <span>Доставка: {new Date(order.deliveryDate).toLocaleDateString('ru-RU')}</span>
+                  </div>
+                )}
+                {order.totalAmount && (
+                  <div className="flex items-center gap-1.5 text-sm text-gray-300">
+                    <CurrencyDollarIcon className="size-4" />
+                    <span>{Number(order.totalAmount).toLocaleString()} ₽</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Разделитель */}
+              <div className="border-t border-white/5 my-3" />
+              
+              {/* Адрес и клиент */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                {order.address && (
+                  <div className="flex items-start gap-1.5 text-sm text-gray-400">
+                    <MapPinIcon className="size-4 flex-shrink-0 mt-0.5" />
+                    <span>{order.address}</span>
+                  </div>
+                )}
+                
+                {order.client && (
+                  <div className="flex items-center gap-1.5 text-sm">
+                    <UserIcon className="size-4 text-gray-400" />
+                    <Link 
+                      href={`/clients/${order.client.id}`}
+                      className="text-indigo-400 hover:text-indigo-300 transition-colors"
+                    >
+                      {order.client.name}
                     </Link>
-                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${statusConfig[order.status]?.color || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                      {statusConfig[order.status]?.label || order.status}
-                    </span>
-                    <span className={`text-xs ${priorityConfig[order.priority]?.color || 'text-gray-400'}`}>
-                      {priorityConfig[order.priority]?.label || order.priority}
-                    </span>
-                  </div>
-                  
-                  {order.description && (
-                    <p className="mt-1 text-sm text-gray-400 line-clamp-2">
-                      {order.description}
-                    </p>
-                  )}
-                  
-                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-400">
-                    {order.address && (
-                      <span className="flex items-center gap-1">
-                        <MapPinIcon className="size-4" />
-                        {order.address}
-                      </span>
-                    )}
-                    {order.totalAmount && (
-                      <span className="flex items-center gap-1">
-                        <CurrencyDollarIcon className="size-4" />
-                        {Number(order.totalAmount).toLocaleString()} ₽
-                      </span>
-                    )}
-                    {order.date && (
-                      <span className="flex items-center gap-1">
-                        <ClockIcon className="size-4" />
-                        {new Date(order.date).toLocaleDateString('ru-RU')}
-                      </span>
-                    )}
-                    {order.client && (
-                      <span className="flex items-center gap-1">
-                        <UserIcon className="size-4" />
-                        <Link href={`/clients/${order.client.id}`} className="hover:text-indigo-400 transition-colors">
-                          {order.client.name}
-                        </Link>
-                      </span>
+                    {order.client.phone && (
+                      <FormattedPhone phone={order.client.phone} />
                     )}
                   </div>
-                </div>
-                
-                {/* Кнопка редактирования */}
-                <Link
-                  href={`/order/${order.id}/edit`}
-                  className="flex-shrink-0 rounded-md bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20 transition-colors"
-                >
-                  Редактировать
-                </Link>
+                )}
+              </div>
+              
+              {/* Участники */}
+              {order.order_participants && order.order_participants.length > 0 && (
+                <>
+                  <div className="border-t border-white/5 my-3" />
+                  <div className="flex items-start gap-2">
+                    <UserGroupIcon className="size-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex flex-wrap gap-1.5">
+                      {order.order_participants.map((p, idx) => (
+                        <span 
+                          key={idx}
+                          className={`px-2 py-0.5 text-xs rounded-full border ${roleColors[p.role] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}
+                        >
+                          {p.user?.name || 'Пользователь'}
+                          <span className="text-gray-500 ml-1">
+                            ({p.role === 'manager' ? 'Менеджер' : p.role === 'measurer' ? 'Замерщик' : 'Сборщик'})
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+              
+              {/* Дата создания */}
+              <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-1.5 text-xs text-gray-500">
+                <ClockIcon className="size-3.5" />
+                <span>Создан: {new Date(order.createdAt).toLocaleDateString('ru-RU', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric'
+                })}</span>
               </div>
             </div>
           ))}
           
           {/* Пагинация */}
           <Pagination
-            currentPage={pagination.page}
-            totalPages={pagination.totalPages}
-            totalItems={pagination.total}
-            itemsPerPage={pagination.limit}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalCount}
+            itemsPerPage={ITEMS_PER_PAGE}
             onPageChange={handlePageChange}
           />
         </div>

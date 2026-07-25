@@ -17,7 +17,9 @@ import {
   XMarkIcon,
   BriefcaseIcon,
   WrenchScrewdriverIcon,
-  TruckIcon
+  TruckIcon,
+  CalendarDaysIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline'
 import { ChevronDownIcon } from '@heroicons/react/16/solid'
 
@@ -57,7 +59,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
   const [clients, setClients] = useState([])
   const [users, setUsers] = useState([])
   const [images, setImages] = useState(order?.images || [])
-  const [participants, setParticipants] = useState([])  // Инициализируем пустым массивом
+  const [participants, setParticipants] = useState([])
   const [newParticipant, setNewParticipant] = useState({ userId: '', role: 'manager' })
   const [formData, setFormData] = useState({
     title: '',
@@ -73,13 +75,12 @@ export default function OrderForm({ order = null, isEdit = false }) {
   })
 
   useEffect(() => {
+    // Загружаем клиентов и пользователей при монтировании
     fetchClients()
     fetchUsers()
 
+    // Если есть данные заказа, заполняем форму
     if (order) {
-      console.log('📦 Order data:', order) // Для отладки
-      console.log('👥 Participants:', order.participants || order.order_participants) // Для отладки
-
       setFormData({
         title: order.title || '',
         description: order.description || '',
@@ -97,10 +98,8 @@ export default function OrderForm({ order = null, isEdit = false }) {
         setImages(order.images)
       }
 
-      // Инициализация участников
       const participantsData = order.participants || order.order_participants || []
       if (participantsData.length > 0) {
-        console.log('✅ Setting participants:', participantsData)
         setParticipants(participantsData)
       }
     }
@@ -111,7 +110,15 @@ export default function OrderForm({ order = null, isEdit = false }) {
       const res = await fetch('/api/clients')
       if (!res.ok) throw new Error('Failed to fetch clients')
       const data = await res.json()
-      setClients(Array.isArray(data) ? data : [])
+      // Проверяем структуру ответа
+      if (data.data && Array.isArray(data.data)) {
+        setClients(data.data)
+      } else if (Array.isArray(data)) {
+        setClients(data)
+      } else {
+        setClients([])
+      }
+      console.log('👥 Загружено клиентов:', clients.length) // Для отладки
     } catch (error) {
       console.error('Error fetching clients:', error)
       setClients([])
@@ -152,7 +159,6 @@ export default function OrderForm({ order = null, isEdit = false }) {
     const user = users.find(u => u.id === newParticipant.userId)
     if (!user) return
 
-    // Проверяем, не добавлен ли уже этот пользователь с такой же ролью
     const existing = participants.find(
       p => p.userId === newParticipant.userId && p.role === newParticipant.role
     )
@@ -167,7 +173,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
         id: `temp-${Date.now()}`,
         userId: newParticipant.userId,
         role: newParticipant.role,
-        user: { name: user.name }
+        user: { name: user.name, image: user.image }
       }
     ])
 
@@ -196,8 +202,6 @@ export default function OrderForm({ order = null, isEdit = false }) {
         }))
       }
 
-      console.log('📤 Sending participants:', submitData.participants) // Для отладки
-
       const url = isEdit ? `/api/orders/${order.id}` : '/api/orders'
       const method = isEdit ? 'PUT' : 'POST'
 
@@ -224,6 +228,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-12">
+      {/* Основная информация */}
       <div className="border-b border-white/10 pb-12">
         <h2 className="text-base/7 font-semibold text-white">
           {isEdit ? 'Редактирование заказа' : 'Создание заказа'}
@@ -252,33 +257,6 @@ export default function OrderForm({ order = null, isEdit = false }) {
                   className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white placeholder:text-gray-500 focus:outline-none sm:text-sm/6"
                 />
               </div>
-            </div>
-          </div>
-
-          {/* Клиент */}
-          <div className="sm:col-span-3">
-            <label htmlFor="clientId" className="block text-sm/6 font-medium text-white">
-              Клиент
-            </label>
-            <div className="mt-2 grid grid-cols-1">
-              <select
-                id="clientId"
-                name="clientId"
-                value={formData.clientId}
-                onChange={handleChange}
-                className="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white/5 py-1.5 pr-8 pl-3 text-base text-white outline-1 -outline-offset-1 outline-white/10 *:bg-gray-800 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
-              >
-                <option value="">Без клиента</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDownIcon
-                aria-hidden="true"
-                className="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-gray-400 sm:size-4"
-              />
             </div>
           </div>
 
@@ -331,68 +309,35 @@ export default function OrderForm({ order = null, isEdit = false }) {
             </div>
           </div>
 
-          {/* Дата выполнения */}
-          <div className="sm:col-span-2">
-            <label htmlFor="date" className="block text-sm/6 font-medium text-white">
-              Дата выполнения
+          {/* Клиент */}
+          <div className="sm:col-span-3">
+            <label htmlFor="clientId" className="block text-sm/6 font-medium text-white">
+              Клиент
             </label>
-            <div className="mt-2">
-              <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
-                <CalendarIcon className="size-5 text-gray-400 shrink-0" />
-                <input
-                  id="date"
-                  name="date"
-                  type="date"
-                  value={formData.date}
-                  onChange={handleChange}
-                  className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white focus:outline-none sm:text-sm/6"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Дата сборки */}
-          <div className="sm:col-span-2">
-            <label htmlFor="assemblyDate" className="block text-sm/6 font-medium text-white">
-              Дата сборки
-            </label>
-            <div className="mt-2">
-              <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
-                <CalendarIcon className="size-5 text-gray-400 shrink-0" />
-                <input
-                  id="assemblyDate"
-                  name="assemblyDate"
-                  type="date"
-                  value={formData.assemblyDate}
-                  onChange={handleChange}
-                  className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white focus:outline-none sm:text-sm/6"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Дата доставки */}
-          <div className="sm:col-span-2">
-            <label htmlFor="deliveryDate" className="block text-sm/6 font-medium text-white">
-              Дата доставки
-            </label>
-            <div className="mt-2">
-              <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
-                <CalendarIcon className="size-5 text-gray-400 shrink-0" />
-                <input
-                  id="deliveryDate"
-                  name="deliveryDate"
-                  type="date"
-                  value={formData.deliveryDate}
-                  onChange={handleChange}
-                  className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white focus:outline-none sm:text-sm/6"
-                />
-              </div>
+            <div className="mt-2 grid grid-cols-1">
+              <select
+                id="clientId"
+                name="clientId"
+                value={formData.clientId}
+                onChange={handleChange}
+                className="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white/5 py-1.5 pr-8 pl-3 text-base text-white outline-1 -outline-offset-1 outline-white/10 *:bg-gray-800 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
+              >
+                <option value="">Без клиента</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name} {client.phone ? `(${client.phone})` : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDownIcon
+                aria-hidden="true"
+                className="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-gray-400 sm:size-4"
+              />
             </div>
           </div>
 
           {/* Сумма */}
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-3">
             <label htmlFor="totalAmount" className="block text-sm/6 font-medium text-white">
               Сумма
             </label>
@@ -414,7 +359,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
           {/* Адрес */}
           <div className="col-span-full">
             <label htmlFor="address" className="block text-sm/6 font-medium text-white">
-              📍 Адрес выполнения
+              Адрес выполнения
             </label>
             <div className="mt-2">
               <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
@@ -431,23 +376,69 @@ export default function OrderForm({ order = null, isEdit = false }) {
               </div>
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Описание */}
-          <div className="col-span-full">
-            <label htmlFor="description" className="block text-sm/6 font-medium text-white">
-              Описание
+      {/* Даты заказа */}
+      <div className="border-b border-white/10 pb-12">
+        <div className="flex items-center gap-2 mb-6">
+          <CalendarDaysIcon className="size-5 text-gray-400" />
+          <h2 className="text-base/7 font-semibold text-white">Даты заказа</h2>
+        </div>
+
+        <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-3">
+          <div>
+            <label htmlFor="date" className="block text-sm/6 font-medium text-white">
+              Дата выполнения
             </label>
             <div className="mt-2">
-              <div className="flex rounded-md bg-white/5 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
-                <DocumentTextIcon className="size-5 text-gray-400 shrink-0 m-3" />
-                <textarea
-                  id="description"
-                  name="description"
-                  rows={4}
-                  value={formData.description}
+              <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
+                <CalendarIcon className="size-5 text-gray-400 shrink-0" />
+                <input
+                  id="date"
+                  name="date"
+                  type="date"
+                  value={formData.date}
                   onChange={handleChange}
-                  placeholder="Подробное описание заказа..."
-                  className="block w-full bg-transparent py-1.5 pr-3 pl-0 text-base text-white placeholder:text-gray-500 focus:outline-none sm:text-sm/6"
+                  className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white focus:outline-none sm:text-sm/6"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="assemblyDate" className="block text-sm/6 font-medium text-white">
+              Дата сборки
+            </label>
+            <div className="mt-2">
+              <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
+                <WrenchScrewdriverIcon className="size-5 text-gray-400 shrink-0" />
+                <input
+                  id="assemblyDate"
+                  name="assemblyDate"
+                  type="date"
+                  value={formData.assemblyDate}
+                  onChange={handleChange}
+                  className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white focus:outline-none sm:text-sm/6"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="deliveryDate" className="block text-sm/6 font-medium text-white">
+              Дата доставки
+            </label>
+            <div className="mt-2">
+              <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
+                <TruckIcon className="size-5 text-gray-400 shrink-0" />
+                <input
+                  id="deliveryDate"
+                  name="deliveryDate"
+                  type="date"
+                  value={formData.deliveryDate}
+                  onChange={handleChange}
+                  className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white focus:outline-none sm:text-sm/6"
                 />
               </div>
             </div>
@@ -457,16 +448,15 @@ export default function OrderForm({ order = null, isEdit = false }) {
 
       {/* Участники заказа */}
       <div className="border-b border-white/10 pb-12">
-        <h2 className="text-base/7 font-semibold text-white">Участники заказа</h2>
-        <p className="mt-1 text-sm/6 text-gray-400">
-          Назначьте сотрудников на роли в заказе
-        </p>
+        <div className="flex items-center gap-2 mb-6">
+          <UserGroupIcon className="size-5 text-gray-400" />
+          <h2 className="text-base/7 font-semibold text-white">Участники заказа</h2>
+        </div>
 
-        <div className="mt-6">
+        <div className="mt-0">
           {/* Список участников */}
           {participants.length > 0 && (
             <div className="space-y-3 mb-4">
-              {/* Группируем по ролям */}
               {Object.entries(
                 participants.reduce((acc, p) => {
                   const role = p.role
@@ -481,7 +471,6 @@ export default function OrderForm({ order = null, isEdit = false }) {
 
                 return (
                   <div key={role} className="flex flex-wrap items-center gap-2">
-                    {/* Бейдж роли */}
                     <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${config.bgColor} ${config.borderColor}`}>
                       <Icon className={`size-3.5 ${config.textColor}`} />
                       <span className={`text-xs font-medium ${config.textColor}`}>
@@ -492,26 +481,44 @@ export default function OrderForm({ order = null, isEdit = false }) {
                       </span>
                     </div>
 
-                    {/* Список пользователей */}
                     <div className="flex flex-wrap gap-1.5">
-                      {users.map((p) => (
-                        <div
-                          key={p.id}
-                          className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
-                        >
-                          <UserIcon className="size-3 text-gray-400" />
-                          <span className="text-sm text-white">
-                            {p.user?.name || 'Пользователь'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveParticipant(p.id)}
-                            className="hover:text-red-400 transition-colors ml-0.5"
+                      {users.map((p) => {
+                        const user = p.user || {}
+                        const avatarUrl = user.image || null
+                        const userName = user.name || 'Пользователь'
+                        const initial = userName[0]?.toUpperCase() || 'П'
+
+                        return (
+                          <div
+                            key={p.id}
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
                           >
-                            <XMarkIcon className="size-3.5 text-gray-400 hover:text-red-400 transition-colors" />
-                          </button>
-                        </div>
-                      ))}
+                            {avatarUrl ? (
+                              <img
+                                src={avatarUrl}
+                                alt={userName}
+                                className="size-5 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="size-5 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                                <span className="text-[10px] font-medium text-indigo-400">
+                                  {initial}
+                                </span>
+                              </div>
+                            )}
+                            <span className="text-sm text-white">
+                              {userName}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveParticipant(p.id)}
+                              className="hover:text-red-400 transition-colors ml-0.5"
+                            >
+                              <XMarkIcon className="size-3.5 text-gray-400 hover:text-red-400 transition-colors" />
+                            </button>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )
@@ -520,12 +527,12 @@ export default function OrderForm({ order = null, isEdit = false }) {
           )}
 
           {/* Добавление участника */}
-          <div className="flex flex-wrap items-center gap-3 mt-4 pt-4">
+          <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-white/10">
             <div className="flex-1 min-w-[150px]">
               <select
                 value={newParticipant.userId}
                 onChange={(e) => setNewParticipant({ ...newParticipant, userId: e.target.value })}
-                className="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white/5 py-1.5 pr-8 pl-3 text-base text-white outline-1 -outline-offset-1 outline-white/10 *:bg-gray-800 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
+                className="w-full rounded-md bg-white/5 py-1.5 pr-8 pl-3 text-base text-white outline-1 -outline-offset-1 outline-white/10 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
               >
                 <option value="">Выберите пользователя</option>
                 {users.map((user) => (
@@ -540,7 +547,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
               <select
                 value={newParticipant.role}
                 onChange={(e) => setNewParticipant({ ...newParticipant, role: e.target.value })}
-                className="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white/5 py-1.5 pr-8 pl-3 text-base text-white outline-1 -outline-offset-1 outline-white/10 *:bg-gray-800 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
+                className="w-full rounded-md bg-white/5 py-1.5 pr-8 pl-3 text-base text-white outline-1 -outline-offset-1 outline-white/10 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
               >
                 <option value="manager">Менеджер</option>
                 <option value="measurer">Замерщик</option>
@@ -560,14 +567,37 @@ export default function OrderForm({ order = null, isEdit = false }) {
         </div>
       </div>
 
+      {/* Описание */}
+      <div className="border-b border-white/10 pb-12">
+        <div className="flex items-center gap-2 mb-6">
+          <DocumentTextIcon className="size-5 text-gray-400" />
+          <h2 className="text-base/7 font-semibold text-white">Описание</h2>
+        </div>
+
+        <div>
+          <div className="flex rounded-md bg-white/5 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
+            <DocumentTextIcon className="size-5 text-gray-400 shrink-0 m-3" />
+            <textarea
+              id="description"
+              name="description"
+              rows={4}
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="Подробное описание заказа..."
+              className="block w-full bg-transparent py-1.5 pr-3 pl-0 text-base text-white placeholder:text-gray-500 focus:outline-none sm:text-sm/6"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Изображения */}
       <div className="border-b border-white/10 pb-12">
-        <h2 className="text-base/7 font-semibold text-white">Изображения</h2>
-        <p className="mt-1 text-sm/6 text-gray-400">
-          Добавьте фотографии, связанные с заказом
-        </p>
+        <div className="flex items-center gap-2 mb-6">
+          <PhotoIcon className="size-5 text-gray-400" />
+          <h2 className="text-base/7 font-semibold text-white">Изображения</h2>
+        </div>
 
-        <div className="mt-10">
+        <div>
           <ImageUpload
             images={images}
             onImagesChange={handleImagesChange}

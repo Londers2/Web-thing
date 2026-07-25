@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { Client } from '@/lib/db/index.js'
 import { Op } from 'sequelize'
 
-// GET - список клиентов
+// GET - список клиентов с пагинацией
 export async function GET(request) {
   try {
     const session = await getServerSession(authOptions)
@@ -15,22 +15,37 @@ export async function GET(request) {
     
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
+    const page = parseInt(searchParams.get('page')) || 1
+    const limit = parseInt(searchParams.get('limit')) || 10
+    const offset = (page - 1) * limit
     
     const where = {}
     if (search) {
       where[Op.or] = [
         { name: { [Op.iLike]: `%${search}%` } },
         { phone: { [Op.iLike]: `%${search}%` } },
+        { address: { [Op.iLike]: `%${search}%` } },
+        { notes: { [Op.iLike]: `%${search}%` } },
       ]
     }
     
-    const clients = await Client.findAll({
+    const { count, rows } = await Client.findAndCountAll({
       where,
       order: [['name', 'ASC']],
-      attributes: ['id', 'name', 'phone', 'address']
+      attributes: ['id', 'name', 'phone', 'address', 'notes'],
+      limit,
+      offset,
     })
     
-    return NextResponse.json(clients)
+    return NextResponse.json({
+      data: rows,
+      pagination: {
+        total: count,
+        page,
+        limit,
+        totalPages: Math.ceil(count / limit),
+      }
+    })
   } catch (error) {
     console.error('GET Clients Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

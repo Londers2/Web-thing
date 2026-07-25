@@ -18,7 +18,7 @@ export default async function EditOrderPage({ params }) {
       },
       {
         model: OrderParticipant,
-        include: [{ model: User, attributes: ['id', 'name', 'email'] }]
+        include: [{ model: User, attributes: ['id', 'name', 'email', 'image'] }]
       }
     ],
   })

@@ -63,8 +63,6 @@ export default function ClientForm({ client = null, isEdit = false }) {
         notes: formData.notes || '',
       }
       
-      console.log('📤 Отправка данных:', submitData) // Для отладки
-      
       const url = isEdit ? `/api/clients/${client.id}` : '/api/clients'
       const method = isEdit ? 'PUT' : 'POST'
       

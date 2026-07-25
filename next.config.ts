@@ -1,16 +1,30 @@
-import type { NextConfig } from "next";
+// next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Отключаем WebSocket для внешних подключений (временно)
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Убираем WebSocket из клиентской сборки
+      config.infrastructureLogging = {
+        level: 'error',
+      };
+    }
+    return config;
+  },
+  // Отключаем автоматическое переподключение
+  devIndicators: {
+    autoPrerender: false,
+  },
+  // Для внешнего доступа
+  experimental: {
+    // (опционально)
+  },
+  // Отключаем WebSocket в dev-режиме
+  onDemandEntries: {
+    // период пересборки страниц
+    maxInactiveAge: 25 * 1000,
+    pagesBufferLength: 2,
+  },
+}
 
-const nextConfig: NextConfig = {
-  serverExternalPackages: ['pg', 'pg-hstore'],
-  allowedDevOrigins: ['192.168.1.151'],
-  // experimental: {
-  //   turbo: {
-  //     resolveAlias: {
-  //       pg: require.resolve('pg'),
-  //       'pg-hstore': require.resolve('pg-hstore'),
-  //     },
-  //   },
-  // },
-};
-
-export default nextConfig;
+module.exports = nextConfig
