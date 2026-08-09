@@ -8,7 +8,8 @@
     "dev:phone": "NEXT_PRIVATE_LOCAL_WEBPACK=0 next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:sync": "node --env-file=.env.local db-init.js"
   },
   "dependencies": {
     "@auth/sequelize-adapter": "^2.11.1",
@@ -22,6 +23,7 @@
     "@headlessui/react": "^2.2.10",
     "@heroicons/react": "^2.2.0",
     "date-fns": "^4.4.0",
+    "dotenv": "^17.4.2",
     "heroicons": "^2.2.0",
     "input-format": "^0.3.14",
     "lodash": "^4.18.1",

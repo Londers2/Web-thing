@@ -23,8 +23,11 @@ import {
   DocumentTextIcon,
   InformationCircleIcon,
   PhoneIcon,
-  ClockIcon
+  ClockIcon,
+  CubeIcon,
+  ClipboardDocumentCheckIcon
 } from '@heroicons/react/24/outline'
+import { EVENT_TYPES } from '@/lib/constants/eventTypes'
 
 const ITEMS_PER_PAGE = 10
 
@@ -41,13 +44,17 @@ const priorityConfig = {
   high: { label: 'Высокий', color: 'text-red-400' },
 }
 
-const roleColors = {
-  manager: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  measurer: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  assembler: 'bg-green-500/10 text-green-400 border-green-500/20'
+function EventBadge({ type }) {
+  const config = EVENT_TYPES[type]
+  if (!config) return null
+  
+  return (
+    <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full border ${config.color}`}>
+      {config.icon} {config.label}
+    </span>
+  )
 }
 
-// Компонент для форматирования телефона
 function FormattedPhone({ phone }) {
   if (!phone) return null
   
@@ -154,7 +161,6 @@ export default function OrderList() {
     return allOrders.filter(order => {
       if (order.title?.toLowerCase().includes(searchLower)) return true
       if (order.description?.toLowerCase().includes(searchLower)) return true
-      if (order.address?.toLowerCase().includes(searchLower)) return true
       
       if (order.client) {
         if (order.client.name?.toLowerCase().includes(searchLower)) return true
@@ -260,7 +266,7 @@ export default function OrderList() {
             <MagnifyingGlassIcon className="size-5 text-gray-400 shrink-0" />
             <input
               type="text"
-              placeholder="Поиск по названию, клиенту, адресу..."
+              placeholder="Поиск по названию, клиенту..."
               value={localSearch}
               onChange={handleSearchChange}
               className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white placeholder:text-gray-500 focus:outline-none sm:text-sm/6"
@@ -387,61 +393,71 @@ export default function OrderList() {
               {/* Разделитель */}
               <div className="border-t border-white/5 my-3" />
               
-              {/* Блок с датами */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
-                <div className="flex items-center gap-1.5 text-sm text-gray-400">
-                  <CalendarIcon className="size-4" />
-                  <span>Выполнение: {order.date ? new Date(order.date).toLocaleDateString('ru-RU') : '—'}</span>
-                </div>
-                {order.assemblyDate && (
-                  <div className="flex items-center gap-1.5 text-sm text-yellow-400/80">
-                    <WrenchScrewdriverIcon className="size-4" />
-                    <span>Сборка: {new Date(order.assemblyDate).toLocaleDateString('ru-RU')}</span>
+              {/* Блок с датами и событиями */}
+              <div className="flex flex-wrap items-center gap-3 mb-3">
+                {order.events && order.events.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <ClipboardDocumentCheckIcon className="size-4 text-gray-400" />
+                    {order.events.slice(0, 3).map((event, idx) => (
+                      <EventBadge key={idx} type={event.type} />
+                    ))}
+                    {order.events.length > 3 && (
+                      <span className="text-xs text-gray-500">+{order.events.length - 3}</span>
+                    )}
                   </div>
+                ) : (
+                  <span className="text-xs text-gray-500">Нет событий</span>
                 )}
-                {order.deliveryDate && (
-                  <div className="flex items-center gap-1.5 text-sm text-green-400/80">
-                    <TruckIcon className="size-4" />
-                    <span>Доставка: {new Date(order.deliveryDate).toLocaleDateString('ru-RU')}</span>
-                  </div>
-                )}
+                
                 {order.totalAmount && (
-                  <div className="flex items-center gap-1.5 text-sm text-gray-300">
+                  <span className="flex items-center gap-1 text-sm text-gray-300">
                     <CurrencyDollarIcon className="size-4" />
-                    <span>{Number(order.totalAmount).toLocaleString()} ₽</span>
-                  </div>
+                    {Number(order.totalAmount).toLocaleString()} ₽
+                  </span>
                 )}
               </div>
               
               {/* Разделитель */}
               <div className="border-t border-white/5 my-3" />
               
-              {/* Адрес и клиент */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                {order.address && (
+              {/* Адреса */}
+              {order.addresses && order.addresses.length > 0 && (
+                <div className="mb-3">
                   <div className="flex items-start gap-1.5 text-sm text-gray-400">
                     <MapPinIcon className="size-4 flex-shrink-0 mt-0.5" />
-                    <span>{order.address}</span>
+                    <div>
+                      {order.addresses.map((addr, idx) => (
+                        <div key={idx} className={idx > 0 ? 'mt-1' : ''}>
+                          {addr.address}
+                          {addr.title && (
+                            <span className="text-gray-500 text-xs ml-2">
+                              ({addr.title})
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                )}
-                
-                {order.client && (
-                  <div className="flex items-center gap-1.5 text-sm">
-                    <UserIcon className="size-4 text-gray-400" />
-                    <Link 
-                      href={`/clients/${order.client.id}`}
-                      className="text-indigo-400 hover:text-indigo-300 transition-colors"
-                    >
-                      {order.client.name}
-                    </Link>
-                    {order.client.phone && (
-                      <FormattedPhone phone={order.client.phone} />
-                    )}
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
               
-              {/* Участники */}
+              {/* Клиент */}
+              {order.client && (
+                <div className="flex items-center gap-1.5 text-sm">
+                  <UserIcon className="size-4 text-gray-400" />
+                  <Link 
+                    href={`/clients/${order.client.id}`}
+                    className="text-indigo-400 hover:text-indigo-300 transition-colors"
+                  >
+                    {order.client.name}
+                  </Link>
+                  {order.client.phone && (
+                    <FormattedPhone phone={order.client.phone} />
+                  )}
+                </div>
+              )}
+              
+              {/* Участники заказа */}
               {order.order_participants && order.order_participants.length > 0 && (
                 <>
                   <div className="border-t border-white/5 my-3" />
@@ -451,7 +467,7 @@ export default function OrderList() {
                       {order.order_participants.map((p, idx) => (
                         <span 
                           key={idx}
-                          className={`px-2 py-0.5 text-xs rounded-full border ${roleColors[p.role] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}
+                          className="px-2 py-0.5 text-xs rounded-full border bg-gray-500/10 text-gray-400 border-gray-500/20"
                         >
                           {p.user?.name || 'Пользователь'}
                           <span className="text-gray-500 ml-1">

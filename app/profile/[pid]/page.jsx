@@ -1,4 +1,4 @@
-import Sidebar from '@/components/sidebar'
+
 import { User } from '@/lib/db/index.js'  // Исправленный путь к вашей модели User
 
 import ProfileContent from './profileContent'
@@ -24,9 +24,7 @@ export default async function ProfilePage({ params }) {
   }
   
   return (
-    <Sidebar>
       <ProfileContent user={user}/>
-    </Sidebar>
   )
 }
 

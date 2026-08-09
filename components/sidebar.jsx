@@ -1,6 +1,7 @@
+// components/Sidebar.jsx
 'use client'
 
-import { Children, useState } from 'react'
+import { useState } from 'react'
 import { Dialog, DialogBackdrop, DialogPanel, TransitionChild } from '@headlessui/react'
 import {
   Bars3Icon,
@@ -11,38 +12,57 @@ import {
   HomeIcon,
   UsersIcon,
   XMarkIcon,
+  ArrowRightOnRectangleIcon,
 } from '@heroicons/react/24/outline'
-
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
 
 const navigation = [
   { name: 'Главная', href: '/', icon: HomeIcon },
   { name: 'Клиенты', href: '/clients', icon: UsersIcon },
-  // { name: 'Projects', href: '#', icon: FolderIcon },
-  // { name: 'Calendar', href: '#', icon: CalendarIcon },
   { name: 'Заказы', href: '/order', icon: DocumentDuplicateIcon },
+  // { name: 'Календарь', href: '/calendar', icon: CalendarIcon },
   // { name: 'Reports', href: '#', icon: ChartPieIcon },
-]
-const teams = [
-  { id: 1, name: 'Heroicons', href: '#', initial: 'H', current: false },
-  { id: 2, name: 'Tailwind Labs', href: '#', initial: 'T', current: false },
-  { id: 3, name: 'Workcation', href: '#', initial: 'W', current: false },
 ]
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Sidebar({children}) {
+export default function Sidebar({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
+  const pathname = usePathname()
+  const router = useRouter()
 
-  console.log(session)
+  // Не показываем сайдбар на странице входа и ошибок
+  if (pathname?.startsWith('/api/auth') || pathname === '/auth/error') {
+    return children
+  }
+
+  const handleLogout = async () => {
+    // Очищаем куки
+    document.cookie.split(';').forEach(cookie => {
+      const [key] = cookie.trim().split('=')
+      if (key.startsWith('next-auth.')) {
+        document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
+      }
+    })
+    await signOut({ redirect: false })
+    router.push('/api/auth/signin')
+  }
+
+  // Обновляем current для навигации
+  const navigationWithCurrent = navigation.map((item) => ({
+    ...item,
+    current: pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
+  }))
 
   return (
     <>
       <div>
+        {/* Мобильный сайдбар */}
         <Dialog open={sidebarOpen} onClose={setSidebarOpen} className="relative z-50 lg:hidden">
           <DialogBackdrop
             transition
@@ -62,23 +82,20 @@ export default function Sidebar({children}) {
                   </button>
                 </div>
               </TransitionChild>
-              {/* Sidebar component, swap this element with another sidebar if you like */}
+
               <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-900 px-6 pb-2 ring-1 ring-white/10">
                 <div className="flex h-16 shrink-0 items-center">
-                  <img
-                    alt="Your Company"
-                    // src={session.image}
-                    className="h-8 w-auto"
-                  />
+                  <span className="text-xl font-bold text-white">Web Thing</span>
                 </div>
                 <nav className="flex flex-1 flex-col">
                   <ul role="list" className="flex flex-1 flex-col gap-y-7">
                     <li>
                       <ul role="list" className="-mx-2 space-y-1">
-                        {navigation.map((item) => (
+                        {navigationWithCurrent.map((item) => (
                           <li key={item.name}>
                             <Link
                               href={item.href}
+                              onClick={() => setSidebarOpen(false)}
                               className={classNames(
                                 item.current
                                   ? 'bg-gray-800 text-white'
@@ -93,29 +110,33 @@ export default function Sidebar({children}) {
                         ))}
                       </ul>
                     </li>
-                    {/* <li>
-                      <div className="text-xs/6 font-semibold text-gray-400">Your teams</div>
-                      <ul role="list" className="-mx-2 mt-2 space-y-1">
-                        {teams.map((team) => (
-                          <li key={team.name}>
-                            <a
-                              href={team.href}
-                              className={classNames(
-                                team.current
-                                  ? 'bg-gray-800 text-white'
-                                  : 'text-gray-400 hover:bg-gray-800 hover:text-white',
-                                'group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold',
-                              )}
-                            >
-                              <span className="flex size-6 shrink-0 items-center justify-center rounded-lg border border-gray-700 bg-gray-800 text-[0.625rem] font-medium text-gray-400 group-hover:text-white">
-                                {team.initial}
-                              </span>
-                              <span className="truncate">{team.name}</span>
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </li> */}
+                    <li className="-mx-6 mt-auto">
+                      <div className="flex flex-col gap-2">
+                        {session?.user && (
+                          <Link
+                            href={'/profile/' + session?.user?.id}
+                            className="flex items-center gap-x-4 px-6 py-3 text-sm/6 font-semibold text-white hover:bg-gray-800"
+                          >
+                            <img
+                              alt=""
+                              src={session?.user?.image || '/default-avatar.png'}
+                              className="size-8 rounded-full bg-gray-800 object-cover"
+                              onError={(e) => {
+                                e.target.src = '/default-avatar.png'
+                              }}
+                            />
+                            <span aria-hidden="true">{session?.user?.name || 'Пользователь'}</span>
+                          </Link>
+                        )}
+                        <button
+                          onClick={handleLogout}
+                          className="flex items-center gap-x-4 px-6 py-3 text-sm/6 font-semibold text-red-400 hover:bg-gray-800 hover:text-red-300"
+                        >
+                          <ArrowRightOnRectangleIcon className="size-5" />
+                          Выйти
+                        </button>
+                      </div>
+                    </li>
                   </ul>
                 </nav>
               </div>
@@ -123,21 +144,17 @@ export default function Sidebar({children}) {
           </div>
         </Dialog>
 
-        {/* Static sidebar for desktop */}
+        {/* Десктопный сайдбар */}
         <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-          {/* Sidebar component, swap this element with another sidebar if you like */}
-          <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-900 px-6">
+          <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-900 px-6 pb-4">
             <div className="flex h-16 shrink-0 items-center">
-              <img
-                alt="Your Company"
-                className="h-8 w-auto"
-              />
+              <span className="text-xl font-bold text-white">Web Thing</span>
             </div>
             <nav className="flex flex-1 flex-col">
               <ul role="list" className="flex flex-1 flex-col gap-y-7">
                 <li>
                   <ul role="list" className="-mx-2 space-y-1">
-                    {navigation.map((item) => (
+                    {navigationWithCurrent.map((item) => (
                       <li key={item.name}>
                         <Link
                           href={item.href}
@@ -156,40 +173,60 @@ export default function Sidebar({children}) {
                   </ul>
                 </li>
                 <li className="-mx-6 mt-auto">
-                  <Link   
-                    href={'/profile/' + session?.user?.id}
-                    className="flex items-center gap-x-4 px-6 py-3 text-sm/6 font-semibold text-white hover:bg-gray-800"
-                  >
-                    <img
-                      alt=""
-                      src={session?.user?.image}
-                      className="size-8 rounded-full bg-gray-800"
-                    />
-                    <span className="sr-only">Your profile</span>
-                    <span aria-hidden="true">{session?.user?.name}</span>
-                  </Link>
+                  <div className="flex flex-col gap-2">
+                    {session?.user && (
+                      <Link
+                        href={'/profile/' + session?.user?.id}
+                        className="flex items-center gap-x-4 px-6 py-3 text-sm/6 font-semibold text-white hover:bg-gray-800"
+                      >
+                        <img
+                          alt=""
+                          src={session?.user?.image || '/default-avatar.png'}
+                          className="size-8 rounded-full bg-gray-800 object-cover"
+                          onError={(e) => {
+                            e.target.src = '/default-avatar.png'
+                          }}
+                        />
+                        <span aria-hidden="true">{session?.user?.name || 'Пользователь'}</span>
+                      </Link>
+                    )}
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-x-4 px-6 py-3 text-sm/6 font-semibold text-red-400 hover:bg-gray-800 hover:text-red-300"
+                    >
+                      <ArrowRightOnRectangleIcon className="size-5" />
+                      Выйти
+                    </button>
+                  </div>
                 </li>
               </ul>
             </nav>
           </div>
         </div>
 
+        {/* Мобильный хедер */}
         <div className="sticky top-0 z-40 flex items-center gap-x-6 bg-gray-900 px-4 py-4 shadow-xs sm:px-6 lg:hidden">
           <button type="button" onClick={() => setSidebarOpen(true)} className="-m-2.5 p-2.5 text-gray-400 lg:hidden">
             <span className="sr-only">Open sidebar</span>
             <Bars3Icon aria-hidden="true" className="size-6" />
           </button>
-          <div className="flex-1 text-sm/6 font-semibold text-white">Dashboard</div>
-          <Link href={'/profile/' + session?.user?.id}>
-            <span className="sr-only">Your profile</span>
-            <img
-              alt=""
-              src={session?.user?.image}
-              className="size-8 rounded-full bg-gray-800"
-            />
-          </Link>
+          <div className="flex-1 text-sm/6 font-semibold text-white">Web Thing</div>
+          {session?.user && (
+            <Link href={'/profile/' + session?.user?.id}>
+              <span className="sr-only">Your profile</span>
+              <img
+                alt=""
+                src={session?.user?.image || '/default-avatar.png'}
+                className="size-8 rounded-full bg-gray-800 object-cover"
+                onError={(e) => {
+                  e.target.src = '/default-avatar.png'
+                }}
+              />
+            </Link>
+          )}
         </div>
 
+        {/* Основной контент */}
         <main className="py-10 lg:pl-72">
           <div className="px-4 sm:px-6 lg:px-8">{children}</div>
         </main>

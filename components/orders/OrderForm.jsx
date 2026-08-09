@@ -19,9 +19,18 @@ import {
   WrenchScrewdriverIcon,
   TruckIcon,
   CalendarDaysIcon,
-  UserGroupIcon
+  UserGroupIcon,
+  PlusIcon,
+  TrashIcon,
+  ClipboardDocumentCheckIcon,
+  HomeIcon,
+  BuildingOffice2Icon,
+  PencilIcon,
+  CheckIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline'
 import { ChevronDownIcon } from '@heroicons/react/16/solid'
+import { EVENT_TYPES, EVENT_STATUSES } from '@/lib/constants/eventTypes'
 
 const ROLE_LABELS = {
   manager: 'Менеджер',
@@ -61,35 +70,52 @@ export default function OrderForm({ order = null, isEdit = false }) {
   const [images, setImages] = useState(order?.images || [])
   const [participants, setParticipants] = useState([])
   const [newParticipant, setNewParticipant] = useState({ userId: '', role: 'manager' })
+  const [addresses, setAddresses] = useState([])
+  const [events, setEvents] = useState([])
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    address: '',
     status: 'new',
     priority: 'medium',
-    date: '',
-    deliveryDate: '',
-    assemblyDate: '',
     totalAmount: '',
     clientId: '',
   })
 
+  // Состояния для добавления адреса
+  const [showAddressForm, setShowAddressForm] = useState(false)
+  const [newAddress, setNewAddress] = useState({
+    title: '',
+    address: '',
+    city: '',
+    entrance: '',
+    floor: '',
+    apartment: '',
+    intercom: '',
+    comment: '',
+    isDefault: false,
+  })
+
+  // Состояния для добавления события
+  const [showEventForm, setShowEventForm] = useState(false)
+  const [newEvent, setNewEvent] = useState({
+    type: 'measurement',
+    status: 'pending',
+    scheduledDate: '',
+    title: '',
+    description: '',
+    addressId: '',
+  })
+
   useEffect(() => {
-    // Загружаем клиентов и пользователей при монтировании
     fetchClients()
     fetchUsers()
 
-    // Если есть данные заказа, заполняем форму
     if (order) {
       setFormData({
         title: order.title || '',
         description: order.description || '',
-        address: order.address || '',
         status: order.status || 'new',
         priority: order.priority || 'medium',
-        date: order.date ? new Date(order.date).toISOString().split('T')[0] : '',
-        deliveryDate: order.deliveryDate ? new Date(order.deliveryDate).toISOString().split('T')[0] : '',
-        assemblyDate: order.assemblyDate ? new Date(order.assemblyDate).toISOString().split('T')[0] : '',
         totalAmount: order.totalAmount || '',
         clientId: order.clientId || '',
       })
@@ -98,9 +124,16 @@ export default function OrderForm({ order = null, isEdit = false }) {
         setImages(order.images)
       }
 
-      const participantsData = order.participants || order.order_participants || []
-      if (participantsData.length > 0) {
-        setParticipants(participantsData)
+      if (order.order_participants) {
+        setParticipants(order.order_participants)
+      }
+
+      if (order.addresses) {
+        setAddresses(order.addresses)
+      }
+
+      if (order.events) {
+        setEvents(order.events)
       }
     }
   }, [order])
@@ -110,15 +143,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
       const res = await fetch('/api/clients')
       if (!res.ok) throw new Error('Failed to fetch clients')
       const data = await res.json()
-      // Проверяем структуру ответа
-      if (data.data && Array.isArray(data.data)) {
-        setClients(data.data)
-      } else if (Array.isArray(data)) {
-        setClients(data)
-      } else {
-        setClients([])
-      }
-      console.log('👥 Загружено клиентов:', clients.length) // Для отладки
+      setClients(Array.isArray(data) ? data : data.data || [])
     } catch (error) {
       console.error('Error fetching clients:', error)
       setClients([])
@@ -148,6 +173,78 @@ export default function OrderForm({ order = null, isEdit = false }) {
 
   const handleImagesChange = (newImages) => {
     setImages(newImages)
+  }
+
+  // Управление адресами
+  const handleAddAddress = () => {
+    if (!newAddress.address.trim()) {
+      alert('Введите адрес')
+      return
+    }
+
+    setAddresses([
+      ...addresses,
+      {
+        id: `temp-${Date.now()}`,
+        ...newAddress,
+        isDefault: addresses.length === 0 ? true : newAddress.isDefault
+      }
+    ])
+
+    setNewAddress({
+      title: '',
+      address: '',
+      city: '',
+      entrance: '',
+      floor: '',
+      apartment: '',
+      intercom: '',
+      comment: '',
+      isDefault: false,
+    })
+    setShowAddressForm(false)
+  }
+
+  const handleRemoveAddress = (addressId) => {
+    setAddresses(addresses.filter(addr => addr.id !== addressId))
+  }
+
+  const handleSetDefaultAddress = (addressId) => {
+    setAddresses(addresses.map(addr => ({
+      ...addr,
+      isDefault: addr.id === addressId
+    })))
+  }
+
+  // Управление событиями
+  const handleAddEvent = () => {
+    if (!newEvent.scheduledDate) {
+      alert('Выберите дату')
+      return
+    }
+
+    setEvents([
+      ...events,
+      {
+        id: `temp-${Date.now()}`,
+        ...newEvent,
+        addressId: newEvent.addressId || null,
+      }
+    ])
+
+    setNewEvent({
+      type: 'measurement',
+      status: 'pending',
+      scheduledDate: '',
+      title: '',
+      description: '',
+      addressId: '',
+    })
+    setShowEventForm(false)
+  }
+
+  const handleRemoveEvent = (eventId) => {
+    setEvents(events.filter(ev => ev.id !== eventId))
   }
 
   const handleAddParticipant = () => {
@@ -190,17 +287,38 @@ export default function OrderForm({ order = null, isEdit = false }) {
 
     try {
       const submitData = {
-        ...formData,
-        clientId: formData.clientId || null,
+        title: formData.title,
+        description: formData.description || null,
+        status: formData.status,
+        priority: formData.priority,
         totalAmount: formData.totalAmount || null,
-        date: formData.date || null,
-        deliveryDate: formData.deliveryDate || null,
-        assemblyDate: formData.assemblyDate || null,
+        clientId: formData.clientId || null,
+        addresses: addresses.map(addr => ({
+          title: addr.title,
+          address: addr.address,
+          city: addr.city,
+          entrance: addr.entrance,
+          floor: addr.floor,
+          apartment: addr.apartment,
+          intercom: addr.intercom,
+          comment: addr.comment,
+          isDefault: addr.isDefault,
+        })),
+        events: events.map(event => ({
+          type: event.type,
+          status: event.status || 'pending',
+          scheduledDate: event.scheduledDate,
+          title: event.title || '',
+          description: event.description || '',
+          addressId: event.addressId || null,
+        })),
         participants: participants.map(p => ({
           userId: p.userId,
-          role: p.role
+          role: p.role,
         }))
       }
+
+      console.log('📤 Отправка данных:', JSON.stringify(submitData, null, 2))
 
       const url = isEdit ? `/api/orders/${order.id}` : '/api/orders'
       const method = isEdit ? 'PUT' : 'POST'
@@ -225,6 +343,12 @@ export default function OrderForm({ order = null, isEdit = false }) {
       setLoading(false)
     }
   }
+
+  const eventTypeOptions = Object.entries(EVENT_TYPES).map(([key, value]) => ({
+    value: key,
+    label: value.label,
+    icon: value.icon,
+  }))
 
   return (
     <form onSubmit={handleSubmit} className="space-y-12">
@@ -355,95 +479,348 @@ export default function OrderForm({ order = null, isEdit = false }) {
               </div>
             </div>
           </div>
-
-          {/* Адрес */}
-          <div className="col-span-full">
-            <label htmlFor="address" className="block text-sm/6 font-medium text-white">
-              Адрес выполнения
-            </label>
-            <div className="mt-2">
-              <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
-                <MapPinIcon className="size-5 text-gray-400 shrink-0" />
-                <input
-                  id="address"
-                  name="address"
-                  type="text"
-                  value={formData.address}
-                  onChange={handleChange}
-                  placeholder="Введите адрес выполнения заказа"
-                  className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white placeholder:text-gray-500 focus:outline-none sm:text-sm/6"
-                />
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Даты заказа */}
+      {/* Адреса */}
       <div className="border-b border-white/10 pb-12">
-        <div className="flex items-center gap-2 mb-6">
-          <CalendarDaysIcon className="size-5 text-gray-400" />
-          <h2 className="text-base/7 font-semibold text-white">Даты заказа</h2>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <MapPinIcon className="size-5 text-gray-400" />
+            <h2 className="text-base/7 font-semibold text-white">Адреса</h2>
+            <span className="text-xs text-gray-500">({addresses.length})</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAddressForm(true)}
+            className="inline-flex items-center gap-1 rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-400 transition-colors"
+          >
+            <PlusIcon className="size-4" />
+            Добавить адрес
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-3">
-          <div>
-            <label htmlFor="date" className="block text-sm/6 font-medium text-white">
-              Дата выполнения
-            </label>
-            <div className="mt-2">
-              <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
-                <CalendarIcon className="size-5 text-gray-400 shrink-0" />
-                <input
-                  id="date"
-                  name="date"
-                  type="date"
-                  value={formData.date}
-                  onChange={handleChange}
-                  className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white focus:outline-none sm:text-sm/6"
-                />
+        {/* Список адресов */}
+        {addresses.length > 0 && (
+          <div className="space-y-3">
+            {addresses.map((addr) => (
+              <div key={addr.id} className="bg-white/5 rounded-lg p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      {addr.isDefault && (
+                        <span className="px-2 py-0.5 text-xs bg-indigo-500/20 text-indigo-400 rounded-full">
+                          Основной
+                        </span>
+                      )}
+                      {addr.title && (
+                        <span className="text-sm font-medium text-white">{addr.title}</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-400 mt-1">{addr.address}</p>
+                    <div className="flex flex-wrap gap-3 mt-1 text-xs text-gray-500">
+                      {addr.city && <span>Город: {addr.city}</span>}
+                      {addr.entrance && <span>Подъезд: {addr.entrance}</span>}
+                      {addr.floor && <span>Этаж: {addr.floor}</span>}
+                      {addr.apartment && <span>Кв: {addr.apartment}</span>}
+                      {addr.intercom && <span>Домофон: {addr.intercom}</span>}
+                    </div>
+                    {addr.comment && (
+                      <p className="text-xs text-gray-500 mt-1">{addr.comment}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {!addr.isDefault && (
+                      <button
+                        type="button"
+                        onClick={() => handleSetDefaultAddress(addr.id)}
+                        className="text-xs text-indigo-400 hover:text-indigo-300"
+                      >
+                        Сделать основным
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAddress(addr.id)}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <TrashIcon className="size-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
+        )}
 
-          <div>
-            <label htmlFor="assemblyDate" className="block text-sm/6 font-medium text-white">
-              Дата сборки
-            </label>
-            <div className="mt-2">
-              <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
-                <WrenchScrewdriverIcon className="size-5 text-gray-400 shrink-0" />
-                <input
-                  id="assemblyDate"
-                  name="assemblyDate"
-                  type="date"
-                  value={formData.assemblyDate}
-                  onChange={handleChange}
-                  className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white focus:outline-none sm:text-sm/6"
-                />
-              </div>
+        {/* Форма добавления адреса */}
+        {showAddressForm && (
+          <div className="mt-4 bg-white/5 rounded-lg p-4 border border-indigo-500/20">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-sm font-medium text-white">Новый адрес</h3>
+              <button
+                type="button"
+                onClick={() => setShowAddressForm(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <XMarkIcon className="size-5" />
+              </button>
             </div>
-          </div>
 
-          <div>
-            <label htmlFor="deliveryDate" className="block text-sm/6 font-medium text-white">
-              Дата доставки
-            </label>
-            <div className="mt-2">
-              <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
-                <TruckIcon className="size-5 text-gray-400 shrink-0" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Название</label>
                 <input
-                  id="deliveryDate"
-                  name="deliveryDate"
-                  type="date"
-                  value={formData.deliveryDate}
-                  onChange={handleChange}
-                  className="block min-w-0 grow bg-transparent py-1.5 pr-3 pl-2 text-base text-white focus:outline-none sm:text-sm/6"
+                  type="text"
+                  value={newAddress.title}
+                  onChange={(e) => setNewAddress({ ...newAddress, title: e.target.value })}
+                  placeholder="Дом, офис, склад..."
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Адрес *</label>
+                <input
+                  type="text"
+                  value={newAddress.address}
+                  onChange={(e) => setNewAddress({ ...newAddress, address: e.target.value })}
+                  placeholder="Улица, дом..."
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Город</label>
+                <input
+                  type="text"
+                  value={newAddress.city}
+                  onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
+                  placeholder="Город"
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Подъезд</label>
+                <input
+                  type="text"
+                  value={newAddress.entrance}
+                  onChange={(e) => setNewAddress({ ...newAddress, entrance: e.target.value })}
+                  placeholder="Подъезд"
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Этаж</label>
+                <input
+                  type="text"
+                  value={newAddress.floor}
+                  onChange={(e) => setNewAddress({ ...newAddress, floor: e.target.value })}
+                  placeholder="Этаж"
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Квартира</label>
+                <input
+                  type="text"
+                  value={newAddress.apartment}
+                  onChange={(e) => setNewAddress({ ...newAddress, apartment: e.target.value })}
+                  placeholder="Квартира"
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Домофон</label>
+                <input
+                  type="text"
+                  value={newAddress.intercom}
+                  onChange={(e) => setNewAddress({ ...newAddress, intercom: e.target.value })}
+                  placeholder="Код домофона"
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Комментарий</label>
+                <input
+                  type="text"
+                  value={newAddress.comment}
+                  onChange={(e) => setNewAddress({ ...newAddress, comment: e.target.value })}
+                  placeholder="Дополнительная информация"
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
                 />
               </div>
             </div>
+
+            <div className="flex items-center gap-2 mt-3">
+              <input
+                type="checkbox"
+                id="isDefault"
+                checked={newAddress.isDefault}
+                onChange={(e) => setNewAddress({ ...newAddress, isDefault: e.target.checked })}
+                className="rounded border-white/10 bg-white/5 text-indigo-500 focus:ring-indigo-500"
+              />
+              <label htmlFor="isDefault" className="text-sm text-gray-400">
+                Сделать основным адресом
+              </label>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAddAddress}
+              className="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
+            >
+              Добавить адрес
+            </button>
           </div>
+        )}
+      </div>
+
+      {/* События */}
+      <div className="border-b border-white/10 pb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <ClipboardDocumentCheckIcon className="size-5 text-gray-400" />
+            <h2 className="text-base/7 font-semibold text-white">События</h2>
+            <span className="text-xs text-gray-500">({events.length})</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowEventForm(true)}
+            className="inline-flex items-center gap-1 rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-400 transition-colors"
+          >
+            <PlusIcon className="size-4" />
+            Добавить событие
+          </button>
         </div>
+
+        {/* Список событий */}
+        {events.length > 0 && (
+          <div className="space-y-3">
+            {events.map((event) => {
+              const typeInfo = EVENT_TYPES[event.type]
+              return (
+                <div key={event.id} className="bg-white/5 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${typeInfo?.color || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+                          {typeInfo?.icon} {typeInfo?.label || event.type}
+                        </span>
+                        {event.title && (
+                          <span className="text-sm font-medium text-white">{event.title}</span>
+                        )}
+                        {event.scheduledDate && (
+                          <span className="text-xs text-gray-400">
+                            {new Date(event.scheduledDate).toLocaleDateString('ru-RU')}
+                          </span>
+                        )}
+                      </div>
+                      {event.description && (
+                        <p className="text-sm text-gray-400 mt-1">{event.description}</p>
+                      )}
+                      {event.addressId && addresses.find(a => a.id === event.addressId) && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          📍 {addresses.find(a => a.id === event.addressId)?.address}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveEvent(event.id)}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <TrashIcon className="size-4" />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Форма добавления события */}
+        {showEventForm && (
+          <div className="mt-4 bg-white/5 rounded-lg p-4 border border-indigo-500/20">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-sm font-medium text-white">Новое событие</h3>
+              <button
+                type="button"
+                onClick={() => setShowEventForm(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <XMarkIcon className="size-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Тип события *</label>
+                <select
+                  value={newEvent.type}
+                  onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value })}
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                >
+                  {eventTypeOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.icon} {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Дата *</label>
+                <input
+                  type="date"
+                  value={newEvent.scheduledDate}
+                  onChange={(e) => setNewEvent({ ...newEvent, scheduledDate: e.target.value })}
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Название</label>
+                <input
+                  type="text"
+                  value={newEvent.title}
+                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                  placeholder="Название события"
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Адрес</label>
+                <select
+                  value={newEvent.addressId}
+                  onChange={(e) => setNewEvent({ ...newEvent, addressId: e.target.value })}
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">Без адреса</option>
+                  {addresses.map((addr) => (
+                    <option key={addr.id} value={addr.id}>
+                      {addr.title || addr.address}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs text-gray-400 mb-1">Описание</label>
+                <textarea
+                  value={newEvent.description}
+                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                  rows={2}
+                  placeholder="Описание события"
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAddEvent}
+              className="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
+            >
+              Добавить событие
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Участники заказа */}
@@ -453,8 +830,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
           <h2 className="text-base/7 font-semibold text-white">Участники заказа</h2>
         </div>
 
-        <div className="mt-0">
-          {/* Список участников */}
+        <div>
           {participants.length > 0 && (
             <div className="space-y-3 mb-4">
               {Object.entries(
@@ -526,7 +902,6 @@ export default function OrderForm({ order = null, isEdit = false }) {
             </div>
           )}
 
-          {/* Добавление участника */}
           <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-white/10">
             <div className="flex-1 min-w-[150px]">
               <select
