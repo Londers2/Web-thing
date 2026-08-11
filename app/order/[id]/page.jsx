@@ -1,5 +1,5 @@
 // app/order/[id]/page.jsx
-import { Order, Client, Image, OrderParticipant, User, Address, Event, EventParticipant } from '@/lib/db/index.js'
+import { Order, Client, Image, OrderParticipant, User, Address, Event } from '@/lib/db/index.js'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { 
@@ -19,13 +19,17 @@ import {
   BriefcaseIcon,
   CalendarDaysIcon,
   InformationCircleIcon,
-  CubeIcon,
   ClipboardDocumentCheckIcon,
   HomeIcon,
   BuildingOffice2Icon,
   CheckCircleIcon,
   XCircleIcon,
-  ClockIcon as ClockIconSolid
+  ChatBubbleLeftRightIcon,
+  BuildingStorefrontIcon,
+  KeyIcon,
+  HashtagIcon,        
+  FolderIcon,         
+  ShoppingBagIcon,    
 } from '@heroicons/react/24/outline'
 import { ChevronRightIcon } from '@heroicons/react/16/solid'
 import { EVENT_TYPES, EVENT_STATUSES } from '@/lib/constants/eventTypes'
@@ -139,7 +143,6 @@ function EventsSection({ events }) {
     )
   }
 
-  // Группируем события по типу
   const groupedEvents = events.reduce((acc, event) => {
     const type = event.type
     if (!acc[type]) acc[type] = []
@@ -153,11 +156,24 @@ function EventsSection({ events }) {
         const typeInfo = EVENT_TYPES[type]
         if (!typeInfo) return null
         
+        // Выбираем иконку для типа события
+        const getIcon = (type) => {
+          switch(type) {
+            case 'measurement': return FolderIcon
+            case 'assembly': return WrenchScrewdriverIcon
+            case 'delivery': return ShoppingBagIcon
+            case 'reclamation': return ReclamationIcon
+            default: return ClipboardDocumentCheckIcon
+          }
+        }
+        const Icon = getIcon(type)
+        
         return (
           <div key={type} className="space-y-2">
             <div className="flex items-center gap-2">
+              <Icon className={`size-4 ${typeInfo.color?.split(' ')[1] || 'text-gray-400'}`} />
               <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${typeInfo.color}`}>
-                {typeInfo.icon} {typeInfo.label}
+                {typeInfo.label}
               </span>
               <span className="text-xs text-gray-500">({typeEvents.length})</span>
             </div>
@@ -197,7 +213,6 @@ function EventsSection({ events }) {
                       </div>
                     )}
 
-                    {/* Дополнительные поля для замера */}
                     {event.type === 'measurement' && event.measurementData && (
                       <div className="mt-2 text-xs text-gray-500">
                         <span className="font-medium text-gray-400">Данные замера:</span>
@@ -207,7 +222,6 @@ function EventsSection({ events }) {
                       </div>
                     )}
 
-                    {/* Поля для рекламации */}
                     {event.type === 'reclamation' && (
                       <div className="mt-2 space-y-1 text-xs">
                         {event.issueDescription && (
@@ -223,7 +237,6 @@ function EventsSection({ events }) {
                       </div>
                     )}
 
-                    {/* Результат выполнения */}
                     {event.result && (
                       <p className="mt-1 text-xs text-gray-400">
                         <span className="text-gray-500">Результат:</span> {event.result}
@@ -270,22 +283,50 @@ function AddressesSection({ addresses }) {
                     Основной
                   </span>
                 )}
-                {addr.title && (
+                {/* {addr.title && (
                   <span className="text-sm font-medium text-white">{addr.title}</span>
-                )}
+                )} */}
               </div>
               <p className="text-sm text-gray-400 mt-1">{addr.address}</p>
               
-              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-gray-500">
-                {addr.city && <span>🏙️ {addr.city}</span>}
-                {addr.entrance && <span>🚪 Подъезд: {addr.entrance}</span>}
-                {addr.floor && <span>🏢 Этаж: {addr.floor}</span>}
-                {addr.apartment && <span>📮 Кв: {addr.apartment}</span>}
-                {addr.intercom && <span>📞 Домофон: {addr.intercom}</span>}
+              <div className="flex flex-col gap-x-3 gap-y-1 mt-1 text-xs text-gray-500">
+                {addr.city && (
+                  <span className="flex items-center gap-1">
+                    <BuildingStorefrontIcon className="size-3" />
+                    {addr.city}
+                  </span>
+                )}
+                {addr.entrance && (
+                  <span className="flex items-center gap-1">
+                    <KeyIcon className="size-3" />
+                    Подъезд: {addr.entrance}
+                  </span>
+                )}
+                {addr.floor && (
+                  <span className="flex items-center gap-1">
+                    <HashtagIcon className="size-3" />
+                    Этаж: {addr.floor}
+                  </span>
+                )}
+                {addr.apartment && (
+                  <span className="flex items-center gap-1">
+                    <HomeIcon className="size-3" />
+                    Кв: {addr.apartment}
+                  </span>
+                )}
+                {addr.intercom && (
+                  <span className="flex items-center gap-1">
+                    <ChatBubbleLeftRightIcon className="size-3" />
+                    Домофон: {addr.intercom}
+                  </span>
+                )}
               </div>
               
               {addr.comment && (
-                <p className="text-xs text-gray-500 mt-1">📝 {addr.comment}</p>
+                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                  <DocumentTextIcon className="size-3" />
+                  {addr.comment}
+                </p>
               )}
             </div>
             

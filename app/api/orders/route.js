@@ -49,51 +49,39 @@ export async function GET(request, { params }) {
 }
 
 // PUT - обновить заказ с адресами и событиями
-export async function PUT(request, { params }) {
+export async function POST(request) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    const { id } = await params
     const body = await request.json()
     
-    console.log('📝 === НАЧАЛО ОБНОВЛЕНИЯ ЗАКАЗА ===')
-    console.log('📝 ID заказа:', id)
-    console.log('📝 Полученные данные:')
-    console.log('  - addresses:', JSON.stringify(body.addresses, null, 2))
-    console.log('  - events:', JSON.stringify(body.events, null, 2))
-    console.log('  - participants:', JSON.stringify(body.participants, null, 2))
-    console.log('  - clientId:', body.clientId)
+    console.log('📦 Создание заказа, полученные данные:')
+    console.log('  addresses:', body.addresses?.length || 0)
+    console.log('  events:', body.events?.length || 0)
     
-    const order = await Order.findByPk(id)
-    if (!order) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
-    }
-    
-    // 1. Обновляем основные поля
-    await order.update({
+    // 1. Создаём заказ
+    const orderData = {
       title: body.title,
       description: body.description || null,
       status: body.status || 'new',
       priority: body.priority || 'medium',
       totalAmount: body.totalAmount || null,
       clientId: body.clientId || null,
-    })
-    console.log('✅ Заказ обновлён')
+      userId: session.user.id,
+    }
     
-    // 2. Удаляем старые адреса
-    const deletedAddresses = await Address.destroy({ where: { orderId: id } })
-    console.log(`🗑️ Удалено старых адресов: ${deletedAddresses}`)
+    const order = await Order.create(orderData)
+    console.log('✅ Заказ создан:', order.id)
     
-    // 3. Создаём новые адреса
+    // 2. Создаём адреса и запоминаем их ID
+    const addressMap = {}
     if (body.addresses && body.addresses.length > 0) {
-      console.log(`📌 Создание ${body.addresses.length} адресов...`)
-      
-      const addressesWithOrder = body.addresses.map(addr => {
-        console.log('  - Обработка адреса:', addr)
-        return {
+      for (let i = 0; i < body.addresses.length; i++) {
+        const addr = body.addresses[i]
+        const newAddress = await Address.create({
           title: addr.title || null,
           address: addr.address,
           city: addr.city || null,
@@ -103,58 +91,60 @@ export async function PUT(request, { params }) {
           intercom: addr.intercom || null,
           comment: addr.comment || null,
           isDefault: addr.isDefault || false,
-          orderId: id,
+          orderId: order.id,
           clientId: body.clientId || null,
-        }
-      })
-      
-      console.log('📌 Данные для создания адресов:', JSON.stringify(addressesWithOrder, null, 2))
-      
-      const createdAddresses = await Address.bulkCreate(addressesWithOrder)
-      console.log(`✅ Создано ${createdAddresses.length} адресов`)
-    } else {
-      console.log('📌 Нет адресов для создания')
+        })
+        // Сохраняем связь: индекс адреса -> реальный ID
+        addressMap[i] = newAddress.id
+        console.log(`  ✅ Адрес ${i + 1} создан: ${newAddress.id}`)
+      }
     }
     
-    // 4. Удаляем старые события
-    const deletedEvents = await Event.destroy({ where: { orderId: id } })
-    console.log(`🗑️ Удалено старых событий: ${deletedEvents}`)
-    
-    // 5. Создаём новые события
+    // 3. Создаём события с правильной привязкой к адресам
     if (body.events && body.events.length > 0) {
-      console.log(`📅 Создание ${body.events.length} событий...`)
-      
-      const eventsWithOrder = body.events.map(event => ({
-        type: event.type,
-        status: event.status || 'pending',
-        scheduledDate: event.scheduledDate || null,
-        title: event.title || null,
-        description: event.description || null,
-        addressId: event.addressId || null,
-        orderId: id,
-      }))
-      
-      console.log('📅 Данные для создания событий:', JSON.stringify(eventsWithOrder, null, 2))
-      
-      const createdEvents = await Event.bulkCreate(eventsWithOrder)
-      console.log(`✅ Создано ${createdEvents.length} событий`)
-    } else {
-      console.log('📅 Нет событий для создания')
+      for (const event of body.events) {
+        let addressId = event.addressId || null
+        
+        // Если addressId передан как строка с индексом (например, "0", "1")
+        // или как временный ID, пытаемся найти реальный ID
+        if (addressId && typeof addressId === 'string') {
+          // Проверяем, может это индекс адреса
+          const index = parseInt(addressId)
+          if (!isNaN(index) && addressMap[index] !== undefined) {
+            addressId = addressMap[index]
+            console.log(`  🔗 Событие привязано к адресу #${index} (${addressId})`)
+          } else if (addressId.startsWith('temp-')) {
+            // Это временный ID, заменяем на null
+            console.log(`  ⚠️ Временный ID адреса, заменяем на null`)
+            addressId = null
+          }
+        }
+        
+        const newEvent = await Event.create({
+          type: event.type,
+          status: event.status || 'pending',
+          scheduledDate: event.scheduledDate || null,
+          title: event.title || null,
+          description: event.description || null,
+          addressId: addressId || null,
+          orderId: order.id,
+        })
+        console.log(`  ✅ Событие создано: ${newEvent.id}`)
+      }
     }
     
-    // 6. Обновляем участников
-    await OrderParticipant.destroy({ where: { orderId: id } })
+    // 4. Добавляем участников
     if (body.participants && body.participants.length > 0) {
       const participants = body.participants.map(p => ({
-        orderId: id,
+        orderId: order.id,
         userId: p.userId,
         role: p.role,
       }))
       await OrderParticipant.bulkCreate(participants)
     }
     
-    // 7. Загружаем обновлённый заказ
-    const updatedOrder = await Order.findByPk(id, {
+    // 5. Загружаем заказ со всеми связями
+    const orderWithRelations = await Order.findByPk(order.id, {
       include: [
         { model: Client },
         { model: Address },
@@ -166,13 +156,9 @@ export async function PUT(request, { params }) {
       ],
     })
     
-    console.log('📝 === ОБНОВЛЕНИЕ ЗАВЕРШЕНО ===')
-    console.log('📝 Итоговые адреса:', updatedOrder.addresses?.length || 0)
-    console.log('📝 Итоговые события:', updatedOrder.events?.length || 0)
-    
-    return NextResponse.json(updatedOrder)
+    return NextResponse.json(orderWithRelations, { status: 201 })
   } catch (error) {
-    console.error('❌ PUT Order Error:', error)
+    console.error('❌ POST Order Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

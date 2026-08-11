@@ -235,12 +235,21 @@ export default function OrderForm({ order = null, isEdit = false }) {
       return
     }
 
+    // Находим выбранный адрес
+    let addressId = newEvent.addressId || null
+
+    // Если выбран адрес, сохраняем его ID или индекс
+    if (addressId) {
+      // Если это реальный ID (из БД), оставляем как есть
+      // Если это временный ID, сохраняем как есть (API разберётся)
+    }
+
     setEvents([
       ...events,
       {
         id: `temp-${Date.now()}`,
         ...newEvent,
-        addressId: newEvent.addressId || null,
+        addressId: addressId,
       }
     ])
 
@@ -298,6 +307,45 @@ export default function OrderForm({ order = null, isEdit = false }) {
     setLoading(true)
 
     try {
+      // Сначала создаём маппинг временных ID адресов на реальные
+      // Для этого сначала создаём адреса, потом события с правильными ID
+
+      // 1. Подготавливаем данные для адресов
+      const addressData = addresses.map(addr => ({
+        title: addr.title || null,
+        address: addr.address,
+        city: addr.city || null,
+        entrance: addr.entrance || null,
+        floor: addr.floor || null,
+        apartment: addr.apartment || null,
+        intercom: addr.intercom || null,
+        comment: addr.comment || null,
+        isDefault: addr.isDefault || false,
+        // Не передаём ID, пусть создаётся новый
+      }))
+
+      // 2. Подготавливаем данные для событий
+      // Если у события есть addressId, но он начинается с "temp-",
+      // значит это ссылка на ещё не созданный адрес — оставляем null
+      const eventData = events.map(event => {
+        let addressId = event.addressId || null
+
+        // Если addressId начинается с "temp-" или это не UUID, значит адрес ещё не создан
+        if (addressId && (addressId.startsWith('temp-') || !addressId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i))) {
+          console.log(`⚠️ Событие "${event.title || event.type}" привязано к временному адресу, заменяем на null`)
+          addressId = null
+        }
+
+        return {
+          type: event.type,
+          status: event.status || 'pending',
+          scheduledDate: event.scheduledDate || null,
+          title: event.title || null,
+          description: event.description || null,
+          addressId: addressId,
+        }
+      })
+
       const submitData = {
         title: formData.title,
         description: formData.description || null,
@@ -305,35 +353,18 @@ export default function OrderForm({ order = null, isEdit = false }) {
         priority: formData.priority,
         totalAmount: formData.totalAmount || null,
         clientId: formData.clientId || null,
-        addresses: addresses.map(addr => ({
-          title: addr.title || null,
-          address: addr.address,
-          city: addr.city || null,
-          entrance: addr.entrance || null,
-          floor: addr.floor || null,
-          apartment: addr.apartment || null,
-          intercom: addr.intercom || null,
-          comment: addr.comment || null,
-          isDefault: addr.isDefault || false,
-        })),
-        events: events.map(event => ({
-          type: event.type,
-          status: event.status || 'pending',
-          scheduledDate: event.scheduledDate,
-          title: event.title || null,
-          description: event.description || null,
-          addressId: event.addressId || null,
-        })),
+        addresses: addressData,
+        events: eventData,
         participants: participants.map(p => ({
           userId: p.userId,
           role: p.role,
         }))
       }
 
-      console.log('📤 Отправка на сервер:', {
-        addressesCount: submitData.addresses.length,
-        eventsCount: submitData.events.length,
-        participantsCount: submitData.participants.length,
+      console.log('📤 Отправка данных:', {
+        addresses: submitData.addresses,
+        events: submitData.events,
+        participants: submitData.participants,
       })
 
       const url = isEdit ? `/api/orders/${order.id}` : '/api/orders'
