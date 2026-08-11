@@ -69,9 +69,9 @@ export default function OrderForm({ order = null, isEdit = false }) {
   const [users, setUsers] = useState([])
   const [images, setImages] = useState(order?.images || [])
   const [participants, setParticipants] = useState([])
-  const [newParticipant, setNewParticipant] = useState({ userId: '', role: 'manager' })
   const [addresses, setAddresses] = useState([])
   const [events, setEvents] = useState([])
+  const [newParticipant, setNewParticipant] = useState({ userId: '', role: 'manager' })
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -111,6 +111,13 @@ export default function OrderForm({ order = null, isEdit = false }) {
     fetchUsers()
 
     if (order) {
+      console.log('📦 Загрузка заказа в форму:', {
+        id: order.id,
+        addresses: order.addresses,
+        events: order.events,
+        participants: order.order_participants,
+      })
+
       setFormData({
         title: order.title || '',
         description: order.description || '',
@@ -124,16 +131,21 @@ export default function OrderForm({ order = null, isEdit = false }) {
         setImages(order.images)
       }
 
-      if (order.order_participants) {
+      // Загружаем участников
+      if (order.order_participants && order.order_participants.length > 0) {
         setParticipants(order.order_participants)
       }
 
-      if (order.addresses) {
+      // Загружаем адреса
+      if (order.addresses && order.addresses.length > 0) {
         setAddresses(order.addresses)
+        console.log('📌 Загружено адресов:', order.addresses.length)
       }
 
-      if (order.events) {
+      // Загружаем события
+      if (order.events && order.events.length > 0) {
         setEvents(order.events)
+        console.log('📅 Загружено событий:', order.events.length)
       }
     }
   }, [order])
@@ -294,22 +306,22 @@ export default function OrderForm({ order = null, isEdit = false }) {
         totalAmount: formData.totalAmount || null,
         clientId: formData.clientId || null,
         addresses: addresses.map(addr => ({
-          title: addr.title,
+          title: addr.title || null,
           address: addr.address,
-          city: addr.city,
-          entrance: addr.entrance,
-          floor: addr.floor,
-          apartment: addr.apartment,
-          intercom: addr.intercom,
-          comment: addr.comment,
-          isDefault: addr.isDefault,
+          city: addr.city || null,
+          entrance: addr.entrance || null,
+          floor: addr.floor || null,
+          apartment: addr.apartment || null,
+          intercom: addr.intercom || null,
+          comment: addr.comment || null,
+          isDefault: addr.isDefault || false,
         })),
         events: events.map(event => ({
           type: event.type,
           status: event.status || 'pending',
           scheduledDate: event.scheduledDate,
-          title: event.title || '',
-          description: event.description || '',
+          title: event.title || null,
+          description: event.description || null,
           addressId: event.addressId || null,
         })),
         participants: participants.map(p => ({
@@ -318,7 +330,11 @@ export default function OrderForm({ order = null, isEdit = false }) {
         }))
       }
 
-      console.log('📤 Отправка данных:', JSON.stringify(submitData, null, 2))
+      console.log('📤 Отправка на сервер:', {
+        addressesCount: submitData.addresses.length,
+        eventsCount: submitData.events.length,
+        participantsCount: submitData.participants.length,
+      })
 
       const url = isEdit ? `/api/orders/${order.id}` : '/api/orders'
       const method = isEdit ? 'PUT' : 'POST'
