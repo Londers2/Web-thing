@@ -23,12 +23,13 @@ import {
   DocumentTextIcon,
   InformationCircleIcon,
   PhoneIcon,
-  ClockIcon
+  ClockIcon,
+  ClipboardDocumentCheckIcon
 } from '@heroicons/react/24/outline'
+import { EVENT_TYPES } from '@/lib/constants/eventTypes'
 
 const ITEMS_PER_PAGE = 10
 
-// Конфигурация статусов
 const statusConfig = {
   new: { label: 'Новый', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
   in_progress: { label: 'В работе', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
@@ -36,14 +37,12 @@ const statusConfig = {
   cancelled: { label: 'Отменён', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
 }
 
-// Конфигурация приоритетов
 const priorityConfig = {
   low: { label: 'Низкий', color: 'text-gray-400' },
   medium: { label: 'Средний', color: 'text-yellow-400' },
   high: { label: 'Высокий', color: 'text-red-400' },
 }
 
-// Компонент для форматирования телефона
 function FormattedPhone({ phone }) {
   if (!phone) return null
 
@@ -94,7 +93,6 @@ function FormattedPhone({ phone }) {
   )
 }
 
-// Компонент информации о поиске
 function SearchInfo() {
   return (
     <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
@@ -156,7 +154,6 @@ export default function OrderList() {
 
       let data = await response.json()
 
-      // Универсальная обработка ответа
       let orders = []
       let paginationData = {
         total: 0,
@@ -203,7 +200,6 @@ export default function OrderList() {
     }
   }
 
-  // Фильтрация на клиенте
   const filteredOrders = useMemo(() => {
     if (!search.trim()) return allOrders
 
@@ -213,7 +209,6 @@ export default function OrderList() {
       if (!order) return false
       if (order.title?.toLowerCase().includes(searchLower)) return true
       if (order.description?.toLowerCase().includes(searchLower)) return true
-      if (order.address?.toLowerCase().includes(searchLower)) return true
 
       if (order.client) {
         if (order.client.name?.toLowerCase().includes(searchLower)) return true
@@ -455,16 +450,11 @@ export default function OrderList() {
                     {Number(order.totalAmount).toLocaleString()} ₽
                   </span>
                 )}
-                {order.date && (
-                  <span className="flex items-center gap-1 text-sm text-gray-400">
-                    <CalendarIcon className="size-4" />
-                    {new Date(order.date).toLocaleDateString('ru-RU')}
-                  </span>
-                )}
               </div>
 
               <div className="border-t border-white/5 my-3" />
 
+              {/* Адреса */}
               {order.addresses && order.addresses.length > 0 && (
                 <div className="mb-3">
                   <div className="flex items-start gap-1.5 text-sm text-gray-400">
@@ -484,6 +474,7 @@ export default function OrderList() {
                 </div>
               )}
 
+              {/* Клиент */}
               {order.client && (
                 <div className="flex items-center gap-1.5 text-sm">
                   <UserIcon className="size-4 text-gray-400" />
@@ -499,6 +490,7 @@ export default function OrderList() {
                 </div>
               )}
 
+              {/* Участники */}
               {order.order_participants && order.order_participants.length > 0 && (
                 <>
                   <div className="border-t border-white/5 my-3" />
@@ -519,6 +511,46 @@ export default function OrderList() {
                       {order.order_participants.length > 3 && (
                         <span className="text-xs text-gray-500">
                           +{order.order_participants.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* События */}
+              {order.events && order.events.length > 0 && (
+                <>
+                  <div className="border-t border-white/5 my-3" />
+                  <div className="flex items-start gap-2">
+                    <ClipboardDocumentCheckIcon className="size-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex flex-wrap gap-1.5">
+                      {order.events.slice(0, 3).map((event, idx) => {
+                        const typeInfo = EVENT_TYPES[event.type]
+                        // Определяем иконку в зависимости от типа
+                        let icon = '📋'
+                        if (event.type === 'measurement') icon = '📏'
+                        else if (event.type === 'assembly') icon = '🔧'
+                        else if (event.type === 'delivery') icon = '🚚'
+                        else if (event.type === 'reclamation') icon = '🔄'
+
+                        return (
+                          <span
+                            key={idx}
+                            className={`px-2 py-0.5 text-xs rounded-full border ${typeInfo?.color || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}
+                          >
+                            {icon} {typeInfo?.label || event.type}
+                            {event.scheduledDate && (
+                              <span className="ml-1 text-gray-500">
+                                {new Date(event.scheduledDate).toLocaleDateString('ru-RU')}
+                              </span>
+                            )}
+                          </span>
+                        )
+                      })}
+                      {order.events.length > 3 && (
+                        <span className="text-xs text-gray-500">
+                          +{order.events.length - 3}
                         </span>
                       )}
                     </div>

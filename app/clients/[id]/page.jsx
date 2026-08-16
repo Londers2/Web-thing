@@ -96,7 +96,7 @@ export default async function ClientPage({ params }) {
         as: 'orders',
         limit: 10,
         order: [['createdAt', 'DESC']],
-        attributes: ['id', 'title', 'status', 'totalAmount', 'createdAt', 'date']
+        attributes: ['id', 'title', 'status', 'totalAmount', 'createdAt']
       }
     ]
   })

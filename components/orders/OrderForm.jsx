@@ -211,7 +211,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
         {
           id: `temp-${Date.now()}`,
           ...newAddress,
-          isDefault: addresses.length === 0 ? true : newAddress.isDefault
+          isDefault: addresses.length === 0 ? true : newAddress.isDefault,
         }
       ])
     }
@@ -346,6 +346,18 @@ export default function OrderForm({ order = null, isEdit = false }) {
     setLoading(true)
 
     try {
+      // Создаём маппинг временных ID адресов на реальные ID
+      const addressIdMap = {}
+      addresses.forEach((addr, index) => {
+        // Если у адреса есть реальный ID (не начинается с temp-), используем его
+        if (addr.id && !addr.id.startsWith('temp-')) {
+          addressIdMap[index] = addr.id
+        } else {
+          // Для новых адресов сохраняем индекс
+          addressIdMap[index] = String(index)
+        }
+      })
+
       const submitData = {
         title: formData.title,
         description: formData.description || null,
@@ -355,21 +367,43 @@ export default function OrderForm({ order = null, isEdit = false }) {
         clientId: formData.clientId || null,
         addresses: addresses.map(addr => ({
           city: addr.city || null,
-          street: addr.street || '',  // <-- Убеждаемся, что street не null
-          house: addr.house || '',    // <-- Убеждаемся, что house не null
+          street: addr.street || '',
+          house: addr.house || '',
           entrance: addr.entrance || null,
           floor: addr.floor || null,
           apartment: addr.apartment || null,
           intercom: addr.intercom || null,
           isDefault: addr.isDefault || false,
+          // Сохраняем оригинальный ID для редактирования
+          id: addr.id && !addr.id.startsWith('temp-') ? addr.id : undefined,
         })),
-        events: events.map(event => ({
-          type: event.type,
-          status: event.status || 'pending',
-          scheduledDate: event.scheduledDate || null,
-          description: event.description || null,
-          addressId: event.addressId || null,
-        })),
+        events: events.map(event => {
+          let addressId = null
+          if (event.addressId) {
+            // Если addressId — это индекс
+            const index = parseInt(event.addressId)
+            if (!isNaN(index) && index >= 0 && index < addresses.length) {
+              // Если у адреса есть реальный UUID, используем его
+              const targetAddress = addresses[index]
+              if (targetAddress.id && !targetAddress.id.startsWith('temp-')) {
+                addressId = targetAddress.id
+              } else {
+                // Иначе передаём индекс для создания связи
+                addressId = String(index)
+              }
+            } else if (event.addressId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+              // Это реальный UUID
+              addressId = event.addressId
+            }
+          }
+          return {
+            type: event.type,
+            status: event.status || 'pending',
+            scheduledDate: event.scheduledDate || null,
+            description: event.description || null,
+            addressId: addressId,
+          }
+        }),
         participants: participants.map(p => ({
           userId: p.userId,
           role: p.role,
@@ -390,14 +424,12 @@ export default function OrderForm({ order = null, isEdit = false }) {
       const responseData = await res.json()
 
       if (!res.ok) {
-        console.error('❌ Ошибка сервера:', responseData)
         throw new Error(responseData.error || 'Ошибка при сохранении заказа')
       }
 
-      console.log('✅ Заказ успешно сохранён:', responseData.id)
       router.push(`/order/${responseData.id}`)
     } catch (error) {
-      console.error('❌ Submit error:', error)
+      console.error('Submit error:', error)
       alert(error.message || 'Произошла ошибка при сохранении заказа')
     } finally {
       setLoading(false)
@@ -409,6 +441,16 @@ export default function OrderForm({ order = null, isEdit = false }) {
     label: value.label,
     icon: value.icon,
   }))
+
+  const buildFullAddress = (city, street, house) => {
+    const parts = []
+
+    if (city) parts.push(city)
+    if (street) parts.push(street)
+    if (house) parts.push(`д. ${house}`)
+
+    return parts.join(', ')
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-12">
@@ -586,7 +628,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-white mt-1">{addr.address}</p>
+                    <p className="text-sm text-white mt-1">{addr.street}</p>
                     <div className="flex flex-wrap gap-3 mt-1 text-xs text-gray-500">
                       {addr.city && <span>🏙️ {addr.city}</span>}
                       {addr.entrance && <span>🚪 Подъезд: {addr.entrance}</span>}
@@ -598,8 +640,9 @@ export default function OrderForm({ order = null, isEdit = false }) {
                   <div className="flex gap-2">
                     <div className="flex-shrink-0">
                       <MapButtons
-                        address={addr.address}
                         city={addr.city}
+                        street={addr.street}
+                        house={addr.house}
                       />
                     </div>
                     {!addr.isDefault && (
@@ -656,7 +699,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
                 <label className="block text-xs text-gray-400 mb-1">Город</label>
                 <input
                   type="text"
-                  value={newAddress.city}
+                  value={newAddress.city || ''}
                   onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
                   placeholder="Город"
                   className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
@@ -666,7 +709,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
                 <label className="block text-xs text-gray-400 mb-1">Улица *</label>
                 <input
                   type="text"
-                  value={newAddress.street}
+                  value={newAddress.street || ''}
                   onChange={(e) => setNewAddress({ ...newAddress, street: e.target.value })}
                   placeholder="Улица"
                   className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
@@ -676,7 +719,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
                 <label className="block text-xs text-gray-400 mb-1">Дом *</label>
                 <input
                   type="text"
-                  value={newAddress.house}
+                  value={newAddress.house || ''}
                   onChange={(e) => setNewAddress({ ...newAddress, house: e.target.value })}
                   placeholder="Номер дома"
                   className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
@@ -686,7 +729,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
                 <label className="block text-xs text-gray-400 mb-1">Подъезд</label>
                 <input
                   type="text"
-                  value={newAddress.entrance}
+                  value={newAddress.entrance || ''}
                   onChange={(e) => setNewAddress({ ...newAddress, entrance: e.target.value })}
                   placeholder="Подъезд"
                   className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
@@ -696,7 +739,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
                 <label className="block text-xs text-gray-400 mb-1">Квартира</label>
                 <input
                   type="text"
-                  value={newAddress.apartment}
+                  value={newAddress.apartment || ''}
                   onChange={(e) => setNewAddress({ ...newAddress, apartment: e.target.value })}
                   placeholder="Квартира"
                   className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
@@ -706,7 +749,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
                 <label className="block text-xs text-gray-400 mb-1">Этаж</label>
                 <input
                   type="text"
-                  value={newAddress.floor}
+                  value={newAddress.floor || ''}
                   onChange={(e) => setNewAddress({ ...newAddress, floor: e.target.value })}
                   placeholder="Этаж"
                   className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
@@ -716,7 +759,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
                 <label className="block text-xs text-gray-400 mb-1">Домофон</label>
                 <input
                   type="text"
-                  value={newAddress.intercom}
+                  value={newAddress.intercom || ''}
                   onChange={(e) => setNewAddress({ ...newAddress, intercom: e.target.value })}
                   placeholder="Код домофона"
                   className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
@@ -728,7 +771,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
               <input
                 type="checkbox"
                 id="isDefault"
-                checked={newAddress.isDefault}
+                checked={newAddress.isDefault || false}
                 onChange={(e) => setNewAddress({ ...newAddress, isDefault: e.target.checked })}
                 className="rounded border-white/10 bg-white/5 text-indigo-500 focus:ring-indigo-500"
               />
@@ -782,13 +825,20 @@ export default function OrderForm({ order = null, isEdit = false }) {
             {events.map((event) => {
               const typeInfo = EVENT_TYPES[event.type]
               const statusInfo = EVENT_STATUSES[event.status] || EVENT_STATUSES.pending
+              // Определяем иконку в зависимости от типа
+              let icon = '📋'
+              if (event.type === 'measurement') icon = '📏'
+              else if (event.type === 'assembly') icon = '🔧'
+              else if (event.type === 'delivery') icon = '🚚'
+              else if (event.type === 'reclamation') icon = '🔄'
+
               return (
                 <div key={event.id} className="bg-white/5 rounded-lg p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${typeInfo?.color || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                          {typeInfo?.icon} {typeInfo?.label || event.type}
+                          {icon} {typeInfo?.label || event.type}
                         </span>
                         <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${statusInfo.color}`}>
                           {statusInfo.label}
@@ -804,7 +854,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
                       )}
                       {event.addressId && addresses.find(a => a.id === event.addressId) && (
                         <p className="text-xs text-gray-500 mt-1">
-                          📍 {addresses.find(a => a.id === event.addressId)?.address}
+                          📍 {addresses.find(a => a.id === event.addressId)?.street}
                         </p>
                       )}
                     </div>
@@ -898,7 +948,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
                   <option value="">Без адреса</option>
                   {addresses.map((addr, index) => (
                     <option key={addr.id} value={addr.id}>
-                      {addr.address}
+                      {buildFullAddress(addr.city, addr.street, addr.house)}
                     </option>
                   ))}
                 </select>
@@ -1054,7 +1104,6 @@ export default function OrderForm({ order = null, isEdit = false }) {
 
         <div>
           <div className="flex rounded-md bg-white/5 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
-            <DocumentTextIcon className="size-5 text-gray-400 shrink-0 m-3" />
             <textarea
               id="description"
               name="description"
@@ -1062,7 +1111,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
               value={formData.description}
               onChange={handleChange}
               placeholder="Подробное описание заказа..."
-              className="block w-full bg-transparent py-1.5 pr-3 pl-0 text-base text-white placeholder:text-gray-500 focus:outline-none sm:text-sm/6"
+              className="block w-full bg-transparent p-3 text-base text-white placeholder:text-gray-500 focus:outline-none sm:text-sm/6"
             />
           </div>
         </div>

@@ -12,7 +12,7 @@ export async function GET(request) {
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
+    
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const clientId = searchParams.get('clientId')
@@ -20,31 +20,28 @@ export async function GET(request) {
     const page = parseInt(searchParams.get('page')) || 1
     const limit = parseInt(searchParams.get('limit')) || 10
     const offset = (page - 1) * limit
-
+    
     const where = {}
     if (status) where.status = status
     if (clientId) where.clientId = clientId
-
+    
     if (search) {
       where[Op.or] = [
         { title: { [Op.iLike]: `%${search}%` } },
         { description: { [Op.iLike]: `%${search}%` } },
-        { address: { [Op.iLike]: `%${search}%` } },
       ]
     }
-
-    // Получаем общее количество
+    
     const totalCount = await Order.count({ where })
-
-    // Получаем заказы с пагинацией
+    
     const rows = await Order.findAll({
       where,
       include: [
-        {
-          model: Client,
-          attributes: ['id', 'name', 'phone', 'address']
+        { 
+          model: Client, 
+          attributes: ['id', 'name', 'phone', 'address'] 
         },
-        {
+        { 
           model: Image,
           as: 'images',
           required: false,
@@ -52,8 +49,8 @@ export async function GET(request) {
         },
         {
           model: OrderParticipant,
-          include: [{
-            model: User,
+          include: [{ 
+            model: User, 
             attributes: ['id', 'name', 'email', 'image']
           }]
         },
@@ -63,22 +60,16 @@ export async function GET(request) {
         },
         {
           model: Event,
-          attributes: ['id', 'type', 'status', 'scheduledDate', 'description', 'addressId'],
-          include: [
-            {
-              model: Address,
-              attributes: ['id', 'address']
-            }
-          ]
+          attributes: ['id', 'type', 'status', 'scheduledDate', 'description', 'addressId']
         }
       ],
       order: [['createdAt', 'DESC']],
       limit,
       offset,
     })
-
+    
     const totalPages = Math.ceil(totalCount / limit)
-
+    
     return NextResponse.json({
       data: rows,
       pagination: {

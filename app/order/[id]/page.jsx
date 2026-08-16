@@ -2,7 +2,7 @@
 import { Order, Client, Image, OrderParticipant, User, Address, Event } from '@/lib/db/index.js'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { 
+import {
   PencilIcon,
   MapPinIcon,
   CurrencyDollarIcon,
@@ -27,9 +27,9 @@ import {
   ChatBubbleLeftRightIcon,
   BuildingStorefrontIcon,
   KeyIcon,
-  HashtagIcon,        
-  FolderIcon,         
-  ShoppingBagIcon,    
+  HashtagIcon,
+  FolderIcon,
+  ShoppingBagIcon,
 } from '@heroicons/react/24/outline'
 import { ChevronRightIcon } from '@heroicons/react/16/solid'
 import { EVENT_TYPES, EVENT_STATUSES } from '@/lib/constants/eventTypes'
@@ -38,12 +38,12 @@ import MapButtons from '@/components/MapButtons'
 // Компонент для форматирования телефона
 function FormattedPhone({ phone }) {
   if (!phone) return null
-  
+
   const formatPhone = (raw) => {
     const cleaned = raw.replace(/\D/g, '')
     const limited = cleaned.slice(0, 11)
     if (limited.length === 0) return ''
-    
+
     let result = '+7'
     if (limited.length > 1) {
       result += ' ('
@@ -71,12 +71,12 @@ function FormattedPhone({ phone }) {
     }
     return result
   }
-  
+
   const formatted = formatPhone(phone)
   if (!formatted) return null
-  
+
   return (
-    <a 
+    <a
       href={`tel:${phone}`}
       className="text-white hover:text-indigo-400 transition-colors flex items-center gap-2"
     >
@@ -94,9 +94,9 @@ function StatusBadge({ status }) {
     completed: { label: 'Выполнен', color: 'bg-green-500/10 text-green-400 border-green-500/20' },
     cancelled: { label: 'Отменён', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
   }
-  
+
   const config = statusConfig[status] || statusConfig.new
-  
+
   return (
     <span className={`px-2.5 py-1 text-xs font-medium rounded-full border ${config.color}`}>
       {config.label}
@@ -111,16 +111,16 @@ function PriorityBadge({ priority }) {
     medium: { label: 'Средний', color: 'text-yellow-400' },
     high: { label: 'Высокий', color: 'text-red-400' },
   }
-  
+
   const config = priorityConfig[priority] || priorityConfig.medium
-  
+
   return <span className={`text-sm font-medium ${config.color}`}>{config.label}</span>
 }
 
 // Компонент статуса события
 function EventStatusBadge({ status }) {
   const config = EVENT_STATUSES[status] || EVENT_STATUSES.pending
-  
+
   return (
     <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full border ${config.color}`}>
       {config.label}
@@ -148,29 +148,29 @@ function EventsSection({ events }) {
       {Object.entries(groupedEvents).map(([type, typeEvents]) => {
         const typeInfo = EVENT_TYPES[type]
         if (!typeInfo) return null
-        
+
         // Выбираем иконку для типа события
         const getIcon = (type) => {
-          switch(type) {
+          switch (type) {
             case 'measurement': return FolderIcon
             case 'assembly': return WrenchScrewdriverIcon
             case 'delivery': return ShoppingBagIcon
-            case 'reclamation': return ReclamationIcon
+            case 'reclamation': return ArrowPathIcon
             default: return ClipboardDocumentCheckIcon
           }
         }
         const Icon = getIcon(type)
-        
+
         return (
           <div key={type} className="space-y-2">
             <div className="flex items-center gap-2">
               <Icon className={`size-4 ${typeInfo.color?.split(' ')[1] || 'text-gray-400'}`} />
-              <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${typeInfo.color}`}>
-                {typeInfo.label}
+              <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${typeInfo?.color || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+                {getIcon(event.type)} {typeInfo?.label || event.type}
               </span>
               <span className="text-xs text-gray-500">({typeEvents.length})</span>
             </div>
-            
+
             {typeEvents.map((event) => (
               <div key={event.id} className="bg-white/5 rounded-lg p-3 ml-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -191,11 +191,11 @@ function EventsSection({ events }) {
                         </span>
                       )}
                     </div>
-                    
+
                     {event.description && (
                       <p className="text-sm text-gray-400 mt-1">{event.description}</p>
                     )}
-                    
+
                     {event.address && (
                       <div className="mt-1 flex items-start gap-1 text-xs text-gray-500">
                         <MapPinIcon className="size-3 flex-shrink-0 mt-0.5" />
@@ -236,7 +236,7 @@ function EventsSection({ events }) {
                       </p>
                     )}
                   </div>
-                  
+
                   {event.startDate && (
                     <div className="text-xs text-gray-500 flex items-center gap-1">
                       <ClockIconSolid className="size-3" />
@@ -278,7 +278,7 @@ function AddressesSection({ addresses }) {
                 )}
               </div>
               <p className="text-sm text-white mt-1">{addr.address}</p>
-              
+
               <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-gray-500">
                 {addr.city && <span>🏙️ {addr.city}</span>}
                 {addr.entrance && <span>🚪 Подъезд: {addr.entrance}</span>}
@@ -287,11 +287,12 @@ function AddressesSection({ addresses }) {
                 {addr.intercom && <span>📞 Домофон: {addr.intercom}</span>}
               </div>
             </div>
-            
+
             <div className="flex-shrink-0">
-              <MapButtons 
-                address={addr.address}
+              <MapButtons
                 city={addr.city}
+                street={addr.street}
+                house={addr.house}
               />
             </div>
           </div>
@@ -304,45 +305,45 @@ function AddressesSection({ addresses }) {
 // Компонент для отображения участников
 function ParticipantsSection({ participants }) {
   if (!participants || participants.length === 0) return null
-  
+
   const roleConfig = {
-    manager: { 
-      label: 'Менеджер', 
+    manager: {
+      label: 'Менеджер',
       icon: BriefcaseIcon,
       color: 'bg-blue-500/10 text-blue-400 border-blue-500/20'
     },
-    measurer: { 
-      label: 'Замерщик', 
+    measurer: {
+      label: 'Замерщик',
       icon: WrenchScrewdriverIcon,
       color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
     },
-    assembler: { 
-      label: 'Сборщик', 
+    assembler: {
+      label: 'Сборщик',
       icon: TruckIcon,
       color: 'bg-green-500/10 text-green-400 border-green-500/20'
     }
   }
-  
+
   const grouped = participants.reduce((acc, p) => {
     const role = p.role
     if (!acc[role]) acc[role] = []
     acc[role].push(p)
     return acc
   }, {})
-  
+
   return (
     <div className="rounded-xl bg-white/5 p-4">
       <div className="flex items-center gap-2 mb-4">
         <UserGroupIcon className="size-5 text-gray-400" />
         <p className="text-sm font-medium text-white">Участники заказа</p>
       </div>
-      
+
       <div className="space-y-3">
         {Object.entries(grouped).map(([role, users]) => {
           const config = roleConfig[role]
           if (!config) return null
           const Icon = config.icon
-          
+
           return (
             <div key={role} className="flex flex-wrap items-center gap-2">
               <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${config.color}`}>
@@ -354,17 +355,17 @@ function ParticipantsSection({ participants }) {
                   {users.length}
                 </span>
               </div>
-              
+
               <div className="flex flex-wrap gap-1.5">
                 {users.map((p) => {
                   const user = p.user || {}
                   const avatarUrl = user.image || null
                   const userName = user.name || 'Пользователь'
                   const initial = userName[0]?.toUpperCase() || 'П'
-                  
+
                   return (
-                    <div 
-                      key={p.id} 
+                    <div
+                      key={p.id}
                       className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
                     >
                       {avatarUrl ? (
@@ -397,11 +398,11 @@ function ParticipantsSection({ participants }) {
 
 export default async function OrderPage({ params }) {
   const { id } = await params
-  
+
   const order = await Order.findByPk(id, {
     include: [
       { model: Client },
-      { 
+      {
         model: Image,
         as: 'images',
         required: false,
@@ -420,13 +421,13 @@ export default async function OrderPage({ params }) {
       }
     ],
   })
-  
+
   if (!order) {
     notFound()
   }
-  
+
   const orderData = order.get({ plain: true })
-  
+
   return (
     <div className="max-w-4xl mx-auto">
       {/* Хлебные крошки */}
@@ -437,7 +438,7 @@ export default async function OrderPage({ params }) {
         <ChevronRightIcon className="size-4" />
         <span className="text-white">{orderData.title}</span>
       </nav>
-      
+
       {/* Заголовок */}
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div>
@@ -449,7 +450,7 @@ export default async function OrderPage({ params }) {
             <PriorityBadge priority={orderData.priority} />
           </div>
         </div>
-        
+
         <Link
           href={`/order/${orderData.id}/edit`}
           className="inline-flex items-center gap-2 rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 transition-colors"
@@ -458,7 +459,7 @@ export default async function OrderPage({ params }) {
           Редактировать
         </Link>
       </div>
-      
+
       {/* Основная информация */}
       <div className="space-y-6">
         {/* Информационные карточки */}
@@ -471,11 +472,11 @@ export default async function OrderPage({ params }) {
               </p>
             </div>
           )}
-          
+
           {orderData.client && (
             <div className="rounded-xl bg-white/5 p-4">
               <p className="text-sm text-gray-400">Клиент</p>
-              <Link 
+              <Link
                 href={`/clients/${orderData.client.id}`}
                 className="text-white hover:text-indigo-400 transition-colors flex items-center gap-2 mt-1"
               >
@@ -489,7 +490,7 @@ export default async function OrderPage({ params }) {
               )}
             </div>
           )}
-          
+
           {orderData.createdAt && (
             <div className="rounded-xl bg-white/5 p-4">
               <p className="text-sm text-gray-400">Создан</p>
@@ -504,7 +505,7 @@ export default async function OrderPage({ params }) {
             </div>
           )}
         </div>
-        
+
         {/* Адреса */}
         <div className="rounded-xl bg-white/5 p-4">
           <div className="flex items-center gap-2 mb-4">
@@ -514,7 +515,7 @@ export default async function OrderPage({ params }) {
           </div>
           <AddressesSection addresses={orderData.addresses || []} />
         </div>
-        
+
         {/* События */}
         <div className="rounded-xl bg-white/5 p-4">
           <div className="flex items-center gap-2 mb-4">
@@ -524,10 +525,10 @@ export default async function OrderPage({ params }) {
           </div>
           <EventsSection events={orderData.events || []} />
         </div>
-        
+
         {/* Участники заказа */}
         <ParticipantsSection participants={orderData.order_participants || []} />
-        
+
         {/* Описание */}
         {orderData.description && (
           <div className="rounded-xl bg-white/5 p-4">
@@ -540,7 +541,7 @@ export default async function OrderPage({ params }) {
             </div>
           </div>
         )}
-        
+
         {/* Изображения */}
         {orderData.images && orderData.images.length > 0 && (
           <div className="rounded-xl bg-white/5 p-4">
@@ -569,7 +570,7 @@ export default async function OrderPage({ params }) {
             </div>
           </div>
         )}
-        
+
         {/* Мета-информация */}
         <div className="rounded-xl bg-white/5 p-4">
           <div className="flex items-center gap-2 mb-2">
