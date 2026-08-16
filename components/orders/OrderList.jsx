@@ -462,7 +462,8 @@ export default function OrderList() {
                     <div>
                       {order.addresses.map((addr, idx) => (
                         <div key={idx} className={idx > 0 ? 'mt-1' : ''}>
-                          {addr.city && `${addr.city}, `}{addr.street}, д. {addr.house}
+                          {addr.city && `${addr.city}, `}
+                          {addr.street}, д. {addr.house}
                           {addr.apartment && `, кв. ${addr.apartment}`}
                           {addr.entrance && `, подъезд ${addr.entrance}`}
                           {addr.floor && `, этаж ${addr.floor}`}

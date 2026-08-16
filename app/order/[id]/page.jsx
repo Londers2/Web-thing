@@ -143,30 +143,28 @@ function EventsSection({ events }) {
     return acc
   }, {})
 
+  // Функция для получения иконки по типу
+  const getIcon = (type) => {
+    switch (type) {
+      case 'measurement': return '📏'
+      case 'assembly': return '🔧'
+      case 'delivery': return '🚚'
+      case 'reclamation': return '🔄'
+      default: return '📋'
+    }
+  }
+
   return (
     <div className="space-y-4">
       {Object.entries(groupedEvents).map(([type, typeEvents]) => {
         const typeInfo = EVENT_TYPES[type]
         if (!typeInfo) return null
 
-        // Выбираем иконку для типа события
-        const getIcon = (type) => {
-          switch (type) {
-            case 'measurement': return FolderIcon
-            case 'assembly': return WrenchScrewdriverIcon
-            case 'delivery': return ShoppingBagIcon
-            case 'reclamation': return ArrowPathIcon
-            default: return ClipboardDocumentCheckIcon
-          }
-        }
-        const Icon = getIcon(type)
-
         return (
           <div key={type} className="space-y-2">
             <div className="flex items-center gap-2">
-              <Icon className={`size-4 ${typeInfo.color?.split(' ')[1] || 'text-gray-400'}`} />
-              <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${typeInfo?.color || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                {getIcon(event.type)} {typeInfo?.label || event.type}
+              <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${typeInfo.color}`}>
+                {getIcon(type)} {typeInfo.label}
               </span>
               <span className="text-xs text-gray-500">({typeEvents.length})</span>
             </div>
@@ -199,10 +197,14 @@ function EventsSection({ events }) {
                     {event.address && (
                       <div className="mt-1 flex items-start gap-1 text-xs text-gray-500">
                         <MapPinIcon className="size-3 flex-shrink-0 mt-0.5" />
-                        <span>{event.address.street}</span>
-                        {event.address.street && (
-                          <span className="text-gray-600">({event.address.street})</span>
-                        )}
+                        <span>
+                          {event.address.city && `${event.address.city}, `}
+                          {event.address.street}, д. {event.address.house}
+                          {event.address.apartment && `, кв. ${event.address.apartment}`}
+                          {event.address.entrance && `, подъезд ${event.address.entrance}`}
+                          {event.address.floor && `, этаж ${event.address.floor}`}
+                          {event.address.intercom && `, домофон ${event.address.intercom}`}
+                        </span>
                       </div>
                     )}
 

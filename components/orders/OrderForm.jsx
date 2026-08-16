@@ -628,7 +628,14 @@ export default function OrderForm({ order = null, isEdit = false }) {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-white mt-1">{addr.street}</p>
+                    <p className="text-sm text-white mt-1">
+                      {addr.city && `${addr.city}, `}
+                      {addr.street}, д. {addr.house}
+                      {addr.apartment && `, кв. ${addr.apartment}`}
+                      {addr.entrance && `, подъезд ${addr.entrance}`}
+                      {addr.floor && `, этаж ${addr.floor}`}
+                      {addr.intercom && `, домофон ${addr.intercom}`}
+                    </p>
                     <div className="flex flex-wrap gap-3 mt-1 text-xs text-gray-500">
                       {addr.city && <span>🏙️ {addr.city}</span>}
                       {addr.entrance && <span>🚪 Подъезд: {addr.entrance}</span>}

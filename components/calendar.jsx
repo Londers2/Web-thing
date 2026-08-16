@@ -13,8 +13,8 @@ import 'tippy.js/dist/tippy.css'
 import '@/styles/calendar.css'
 import EventTooltipContent from './EventTooltipContent'
 
-export default function Calendar({ 
-  events = [], 
+export default function Calendar({
+  events = [],
   onEventClick,
   height = '600px',
   initialView = 'dayGridMonth'
@@ -24,14 +24,14 @@ export default function Calendar({
   // Обработчик монтирования события (добавляем тултипы)
   const handleEventDidMount = useCallback((info) => {
     const el = info.el
-    
+
     // Создаём контейнер для React-компонента
     const container = document.createElement('div')
-    
+
     // Рендерим React-компонент в контейнер
     const root = createRoot(container)
     root.render(<EventTooltipContent event={info.event} />)
-    
+
     // Добавляем тултип с React-контентом
     tippy(el, {
       content: container,
@@ -96,7 +96,7 @@ export default function Calendar({
         eventClassNames={(arg) => {
           const type = arg.event.extendedProps?.type
           const classes = ['fc-daygrid-event']
-          
+
           switch (type) {
             case 'assembly':
               classes.push('fc-event-type-assembly')
@@ -104,16 +104,22 @@ export default function Calendar({
             case 'delivery':
               classes.push('fc-event-type-delivery')
               break
+            case 'measurement':
+              classes.push('fc-event-type-measurement')
+              break
+            case 'reclamation':
+              classes.push('fc-event-type-reclamation')  // <-- Добавляем класс для рекламации
+              break
             default:
               classes.push('fc-event-type-date')
           }
-          
+
           return classes
         }}
         eventContent={(arg) => {
           const type = arg.event.extendedProps?.type
           let icon = '📅'
-          
+
           switch (type) {
             case 'assembly':
               icon = '🔧'
@@ -121,10 +127,16 @@ export default function Calendar({
             case 'delivery':
               icon = '🚚'
               break
+            case 'measurement':
+              icon = '📏'
+              break
+            case 'reclamation':
+              icon = '🔄'  // <-- Иконка для рекламации
+              break
             default:
               icon = '📋'
           }
-          
+
           return {
             html: `
               <div class="flex items-center gap-1 text-white truncate">
