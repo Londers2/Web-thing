@@ -28,6 +28,21 @@ import {
 
 const ITEMS_PER_PAGE = 10
 
+// Конфигурация статусов
+const statusConfig = {
+  new: { label: 'Новый', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+  in_progress: { label: 'В работе', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
+  completed: { label: 'Выполнен', color: 'bg-green-500/10 text-green-400 border-green-500/20' },
+  cancelled: { label: 'Отменён', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
+}
+
+// Конфигурация приоритетов
+const priorityConfig = {
+  low: { label: 'Низкий', color: 'text-gray-400' },
+  medium: { label: 'Средний', color: 'text-yellow-400' },
+  high: { label: 'Высокий', color: 'text-red-400' },
+}
+
 // Компонент для форматирования телефона
 function FormattedPhone({ phone }) {
   if (!phone) return null
@@ -89,20 +104,6 @@ function SearchInfo() {
   )
 }
 
-// Статусы и приоритеты
-const statusConfig = {
-  new: { label: 'Новый', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-  in_progress: { label: 'В работе', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
-  completed: { label: 'Выполнен', color: 'bg-green-500/10 text-green-400 border-green-500/20' },
-  cancelled: { label: 'Отменён', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
-}
-
-const priorityConfig = {
-  low: { label: 'Низкий', color: 'text-gray-400' },
-  medium: { label: 'Средний', color: 'text-yellow-400' },
-  high: { label: 'Высокий', color: 'text-red-400' },
-}
-
 export default function OrderList() {
   const [allOrders, setAllOrders] = useState([])
   const [loading, setLoading] = useState(true)
@@ -142,7 +143,6 @@ export default function OrderList() {
       
       const response = await fetch(`/api/orders?${params}`)
       
-      // Проверяем статус ответа
       if (!response.ok) {
         let errorMessage = 'Ошибка загрузки заказов'
         try {
@@ -154,16 +154,9 @@ export default function OrderList() {
         throw new Error(errorMessage)
       }
       
-      // Парсим JSON с защитой от ошибок
-      let data
-      try {
-        data = await response.json()
-      } catch (e) {
-        console.error('Ошибка парсинга JSON:', e)
-        throw new Error('Некорректный ответ от сервера')
-      }
+      let data = await response.json()
       
-      // Проверяем структуру ответа
+      // Универсальная обработка ответа
       let orders = []
       let paginationData = {
         total: 0,
@@ -172,37 +165,24 @@ export default function OrderList() {
         totalPages: 0
       }
       
-      if (data && typeof data === 'object') {
-        // Проверяем наличие поля data с массивом заказов
-        if (data.data && Array.isArray(data.data)) {
-          orders = data.data
-          if (data.pagination) {
-            paginationData = {
-              total: data.pagination.total || 0,
-              page: data.pagination.page || currentPage,
-              limit: data.pagination.limit || ITEMS_PER_PAGE,
-              totalPages: data.pagination.totalPages || 0
-            }
-          }
-        } 
-        // Если data — это сам массив заказов
-        else if (Array.isArray(data)) {
-          orders = data
+      if (data && data.data && Array.isArray(data.data)) {
+        orders = data.data
+        if (data.pagination) {
           paginationData = {
-            total: data.length,
-            page: currentPage,
-            limit: ITEMS_PER_PAGE,
-            totalPages: Math.ceil(data.length / ITEMS_PER_PAGE)
+            total: data.pagination.total || 0,
+            page: data.pagination.page || currentPage,
+            limit: data.pagination.limit || ITEMS_PER_PAGE,
+            totalPages: data.pagination.totalPages || 0
           }
         }
-        // Неизвестная структура
-        else {
-          console.warn('Неизвестная структура ответа:', data)
-          orders = []
+      } else if (Array.isArray(data)) {
+        orders = data
+        paginationData = {
+          total: data.length,
+          page: currentPage,
+          limit: ITEMS_PER_PAGE,
+          totalPages: Math.ceil(data.length / ITEMS_PER_PAGE)
         }
-      } else {
-        console.warn('Некорректный ответ:', data)
-        orders = []
       }
       
       setAllOrders(orders)
@@ -223,30 +203,24 @@ export default function OrderList() {
     }
   }
   
-  // Фильтрация на клиенте (если нужна дополнительная)
+  // Фильтрация на клиенте
   const filteredOrders = useMemo(() => {
     if (!search.trim()) return allOrders
     
     const searchLower = search.trim().toLowerCase()
     
     return allOrders.filter(order => {
-      // Поиск по названию
+      if (!order) return false
       if (order.title?.toLowerCase().includes(searchLower)) return true
-      
-      // Поиск по описанию
       if (order.description?.toLowerCase().includes(searchLower)) return true
-      
-      // Поиск по адресу
       if (order.address?.toLowerCase().includes(searchLower)) return true
       
-      // Поиск по клиенту
       if (order.client) {
         if (order.client.name?.toLowerCase().includes(searchLower)) return true
         if (order.client.phone?.includes(search.trim())) return true
       }
       
-      // Поиск по участникам
-      if (order.order_participants) {
+      if (order.order_participants && Array.isArray(order.order_participants)) {
         for (const p of order.order_participants) {
           if (p.user?.name?.toLowerCase().includes(searchLower)) return true
         }
@@ -256,23 +230,18 @@ export default function OrderList() {
     })
   }, [allOrders, search])
   
-  // Используем данные пагинации из ответа или вычисляем на клиенте
   const totalCount = pagination.total || filteredOrders.length
   const totalPages = pagination.totalPages || Math.ceil(totalCount / ITEMS_PER_PAGE) || 1
   
-  // Пагинация на клиенте (если API не возвращает пагинированные данные)
   const paginatedOrders = useMemo(() => {
-    // Если API уже вернул пагинированные данные, используем их
     if (pagination.total > 0 && allOrders.length <= ITEMS_PER_PAGE) {
       return filteredOrders
     }
-    // Иначе пагинируем на клиенте
     const start = (currentPage - 1) * ITEMS_PER_PAGE
     const end = start + ITEMS_PER_PAGE
     return filteredOrders.slice(start, end)
   }, [filteredOrders, currentPage, pagination.total, allOrders.length])
   
-  // Сбрасываем страницу при поиске или фильтре
   useEffect(() => {
     setCurrentPage(1)
   }, [search, filter])

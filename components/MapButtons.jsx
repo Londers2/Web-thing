@@ -3,10 +3,23 @@
 
 import Image from 'next/image'
 
-export default function MapButtons({ address }) {
-  if (!address) return null
+export default function MapButtons({ city = '', street = '', house = '' }) {
+  // Собираем полный адрес только из города, улицы и дома
+  const buildFullAddress = () => {
+    const parts = []
+    
+    if (city) parts.push(city)
+    if (street) parts.push(street)
+    if (house) parts.push(`д. ${house}`)
+    
+    return parts.join(', ')
+  }
+
+  const fullAddress = buildFullAddress()
   
-  const encodedAddress = encodeURIComponent(address)
+  if (!fullAddress) return null
+  
+  const encodedAddress = encodeURIComponent(fullAddress)
   
   const maps = [
     {

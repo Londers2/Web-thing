@@ -119,14 +119,7 @@ function PriorityBadge({ priority }) {
 
 // Компонент статуса события
 function EventStatusBadge({ status }) {
-  const statusConfig = {
-    pending: { label: 'Ожидает', color: 'bg-gray-500/10 text-gray-400 border-gray-500/20' },
-    in_progress: { label: 'В работе', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-    completed: { label: 'Выполнен', color: 'bg-green-500/10 text-green-400 border-green-500/20' },
-    cancelled: { label: 'Отменён', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
-  }
-  
-  const config = statusConfig[status] || statusConfig.pending
+  const config = EVENT_STATUSES[status] || EVENT_STATUSES.pending
   
   return (
     <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full border ${config.color}`}>
@@ -283,55 +276,23 @@ function AddressesSection({ addresses }) {
                     Основной
                   </span>
                 )}
-                {/* {addr.title && (
-                  <span className="text-sm font-medium text-white">{addr.title}</span>
-                )} */}
               </div>
-              <p className="text-sm text-gray-400 mt-1">{addr.address}</p>
+              <p className="text-sm text-white mt-1">{addr.address}</p>
               
-              <div className="flex flex-col gap-x-3 gap-y-1 mt-1 text-xs text-gray-500">
-                {addr.city && (
-                  <span className="flex items-center gap-1">
-                    <BuildingStorefrontIcon className="size-3" />
-                    {addr.city}
-                  </span>
-                )}
-                {addr.entrance && (
-                  <span className="flex items-center gap-1">
-                    <KeyIcon className="size-3" />
-                    Подъезд: {addr.entrance}
-                  </span>
-                )}
-                {addr.floor && (
-                  <span className="flex items-center gap-1">
-                    <HashtagIcon className="size-3" />
-                    Этаж: {addr.floor}
-                  </span>
-                )}
-                {addr.apartment && (
-                  <span className="flex items-center gap-1">
-                    <HomeIcon className="size-3" />
-                    Кв: {addr.apartment}
-                  </span>
-                )}
-                {addr.intercom && (
-                  <span className="flex items-center gap-1">
-                    <ChatBubbleLeftRightIcon className="size-3" />
-                    Домофон: {addr.intercom}
-                  </span>
-                )}
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-gray-500">
+                {addr.city && <span>🏙️ {addr.city}</span>}
+                {addr.entrance && <span>🚪 Подъезд: {addr.entrance}</span>}
+                {addr.floor && <span>🏢 Этаж: {addr.floor}</span>}
+                {addr.apartment && <span>📮 Кв: {addr.apartment}</span>}
+                {addr.intercom && <span>📞 Домофон: {addr.intercom}</span>}
               </div>
-              
-              {addr.comment && (
-                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                  <DocumentTextIcon className="size-3" />
-                  {addr.comment}
-                </p>
-              )}
             </div>
             
             <div className="flex-shrink-0">
-              <MapButtons address={addr.address} />
+              <MapButtons 
+                address={addr.address}
+                city={addr.city}
+              />
             </div>
           </div>
         </div>

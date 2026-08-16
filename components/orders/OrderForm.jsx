@@ -27,10 +27,25 @@ import {
   BuildingOffice2Icon,
   PencilIcon,
   CheckIcon,
-  XCircleIcon
+  XCircleIcon,
+  ChatBubbleLeftRightIcon,
+  BuildingStorefrontIcon,
+  KeyIcon,
+  HashtagIcon,
+  FolderIcon,
+  ShoppingBagIcon,
 } from '@heroicons/react/24/outline'
 import { ChevronDownIcon } from '@heroicons/react/16/solid'
-import { EVENT_TYPES, EVENT_STATUSES } from '@/lib/constants/eventTypes'
+import MapButtons from '@/components/MapButtons'
+import { EVENT_TYPES } from '@/lib/constants/eventTypes'
+
+// Конфигурация статусов событий
+const EVENT_STATUSES = {
+  pending: { label: 'Ожидает', color: 'bg-gray-500/10 text-gray-400 border-gray-500/20' },
+  in_progress: { label: 'В работе', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+  completed: { label: 'Выполнен', color: 'bg-green-500/10 text-green-400 border-green-500/20' },
+  cancelled: { label: 'Отменён', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
+}
 
 const ROLE_LABELS = {
   manager: 'Менеджер',
@@ -69,9 +84,35 @@ export default function OrderForm({ order = null, isEdit = false }) {
   const [users, setUsers] = useState([])
   const [images, setImages] = useState(order?.images || [])
   const [participants, setParticipants] = useState([])
-  const [addresses, setAddresses] = useState([])
-  const [events, setEvents] = useState([])
   const [newParticipant, setNewParticipant] = useState({ userId: '', role: 'manager' })
+
+  // Состояния для адресов
+  const [addresses, setAddresses] = useState([])
+  const [showAddressForm, setShowAddressForm] = useState(false)
+  const [editingAddressId, setEditingAddressId] = useState(null)
+  const [newAddress, setNewAddress] = useState({
+    city: '',
+    street: '',
+    house: '',
+    entrance: '',
+    apartment: '',
+    floor: '',
+    intercom: '',
+    isDefault: false,
+  })
+
+  // Состояния для событий
+  const [events, setEvents] = useState([])
+  const [showEventForm, setShowEventForm] = useState(false)
+  const [editingEventId, setEditingEventId] = useState(null)
+  const [newEvent, setNewEvent] = useState({
+    type: 'measurement',
+    status: 'pending',
+    scheduledDate: '',
+    description: '',
+    addressId: '',
+  })
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -81,43 +122,11 @@ export default function OrderForm({ order = null, isEdit = false }) {
     clientId: '',
   })
 
-  // Состояния для добавления адреса
-  const [showAddressForm, setShowAddressForm] = useState(false)
-  const [newAddress, setNewAddress] = useState({
-    title: '',
-    address: '',
-    city: '',
-    entrance: '',
-    floor: '',
-    apartment: '',
-    intercom: '',
-    comment: '',
-    isDefault: false,
-  })
-
-  // Состояния для добавления события
-  const [showEventForm, setShowEventForm] = useState(false)
-  const [newEvent, setNewEvent] = useState({
-    type: 'measurement',
-    status: 'pending',
-    scheduledDate: '',
-    title: '',
-    description: '',
-    addressId: '',
-  })
-
   useEffect(() => {
     fetchClients()
     fetchUsers()
 
     if (order) {
-      console.log('📦 Загрузка заказа в форму:', {
-        id: order.id,
-        addresses: order.addresses,
-        events: order.events,
-        participants: order.order_participants,
-      })
-
       setFormData({
         title: order.title || '',
         description: order.description || '',
@@ -131,21 +140,16 @@ export default function OrderForm({ order = null, isEdit = false }) {
         setImages(order.images)
       }
 
-      // Загружаем участников
-      if (order.order_participants && order.order_participants.length > 0) {
+      if (order.order_participants) {
         setParticipants(order.order_participants)
       }
 
-      // Загружаем адреса
       if (order.addresses && order.addresses.length > 0) {
         setAddresses(order.addresses)
-        console.log('📌 Загружено адресов:', order.addresses.length)
       }
 
-      // Загружаем события
       if (order.events && order.events.length > 0) {
         setEvents(order.events)
-        console.log('📅 Загружено событий:', order.events.length)
       }
     }
   }, [order])
@@ -187,34 +191,57 @@ export default function OrderForm({ order = null, isEdit = false }) {
     setImages(newImages)
   }
 
-  // Управление адресами
+  // --- Управление адресами ---
   const handleAddAddress = () => {
-    if (!newAddress.address.trim()) {
-      alert('Введите адрес')
+    if (!newAddress.street.trim() || !newAddress.house.trim()) {
+      alert('Введите улицу и номер дома')
       return
     }
 
-    setAddresses([
-      ...addresses,
-      {
-        id: `temp-${Date.now()}`,
-        ...newAddress,
-        isDefault: addresses.length === 0 ? true : newAddress.isDefault
-      }
-    ])
+    if (editingAddressId) {
+      setAddresses(addresses.map(addr =>
+        addr.id === editingAddressId
+          ? { ...addr, ...newAddress }
+          : addr
+      ))
+      setEditingAddressId(null)
+    } else {
+      setAddresses([
+        ...addresses,
+        {
+          id: `temp-${Date.now()}`,
+          ...newAddress,
+          isDefault: addresses.length === 0 ? true : newAddress.isDefault
+        }
+      ])
+    }
 
     setNewAddress({
-      title: '',
-      address: '',
       city: '',
+      street: '',
+      house: '',
       entrance: '',
-      floor: '',
       apartment: '',
+      floor: '',
       intercom: '',
-      comment: '',
       isDefault: false,
     })
     setShowAddressForm(false)
+  }
+
+  const handleEditAddress = (address) => {
+    setNewAddress({
+      city: address.city || '',
+      street: address.street || '',
+      house: address.house || '',
+      entrance: address.entrance || '',
+      apartment: address.apartment || '',
+      floor: address.floor || '',
+      intercom: address.intercom || '',
+      isDefault: address.isDefault || false,
+    })
+    setEditingAddressId(address.id)
+    setShowAddressForm(true)
   }
 
   const handleRemoveAddress = (addressId) => {
@@ -228,46 +255,58 @@ export default function OrderForm({ order = null, isEdit = false }) {
     })))
   }
 
-  // Управление событиями
+  // --- Управление событиями ---
   const handleAddEvent = () => {
     if (!newEvent.scheduledDate) {
       alert('Выберите дату')
       return
     }
 
-    // Находим выбранный адрес
-    let addressId = newEvent.addressId || null
-
-    // Если выбран адрес, сохраняем его ID или индекс
-    if (addressId) {
-      // Если это реальный ID (из БД), оставляем как есть
-      // Если это временный ID, сохраняем как есть (API разберётся)
+    if (editingEventId) {
+      setEvents(events.map(ev =>
+        ev.id === editingEventId
+          ? { ...ev, ...newEvent }
+          : ev
+      ))
+      setEditingEventId(null)
+    } else {
+      setEvents([
+        ...events,
+        {
+          id: `temp-${Date.now()}`,
+          ...newEvent,
+          addressId: newEvent.addressId || null,
+        }
+      ])
     }
-
-    setEvents([
-      ...events,
-      {
-        id: `temp-${Date.now()}`,
-        ...newEvent,
-        addressId: addressId,
-      }
-    ])
 
     setNewEvent({
       type: 'measurement',
       status: 'pending',
       scheduledDate: '',
-      title: '',
       description: '',
       addressId: '',
     })
     setShowEventForm(false)
   }
 
+  const handleEditEvent = (event) => {
+    setNewEvent({
+      type: event.type || 'measurement',
+      status: event.status || 'pending',
+      scheduledDate: event.scheduledDate ? new Date(event.scheduledDate).toISOString().split('T')[0] : '',
+      description: event.description || '',
+      addressId: event.addressId || '',
+    })
+    setEditingEventId(event.id)
+    setShowEventForm(true)
+  }
+
   const handleRemoveEvent = (eventId) => {
     setEvents(events.filter(ev => ev.id !== eventId))
   }
 
+  // --- Управление участниками ---
   const handleAddParticipant = () => {
     if (!newParticipant.userId) {
       alert('Выберите пользователя')
@@ -307,111 +346,74 @@ export default function OrderForm({ order = null, isEdit = false }) {
     setLoading(true)
 
     try {
-      // Подготавливаем данные для отправки
-      // Все UUID поля должны быть null, а не пустые строки
       const submitData = {
-        // Основные поля заказа
-        title: formData.title.trim(),
-        description: formData.description?.trim() || null,
+        title: formData.title,
+        description: formData.description || null,
         status: formData.status || 'new',
         priority: formData.priority || 'medium',
         totalAmount: formData.totalAmount || null,
-        clientId: formData.clientId || null,  // <-- ВАЖНО: null вместо пустой строки
-
-        // Адреса
+        clientId: formData.clientId || null,
         addresses: addresses.map(addr => ({
-          title: addr.title?.trim() || null,
-          address: addr.address?.trim(),
-          city: addr.city?.trim() || null,
-          entrance: addr.entrance?.trim() || null,
-          floor: addr.floor?.trim() || null,
-          apartment: addr.apartment?.trim() || null,
-          intercom: addr.intercom?.trim() || null,
-          comment: addr.comment?.trim() || null,
+          city: addr.city || null,
+          street: addr.street || '',  // <-- Убеждаемся, что street не null
+          house: addr.house || '',    // <-- Убеждаемся, что house не null
+          entrance: addr.entrance || null,
+          floor: addr.floor || null,
+          apartment: addr.apartment || null,
+          intercom: addr.intercom || null,
           isDefault: addr.isDefault || false,
         })),
-
-        // События
         events: events.map(event => {
-          // Определяем addressId для события
           let addressId = null
-
-          // Если у события есть addressId
           if (event.addressId) {
-            // Проверяем, является ли это индексом адреса (число)
             const index = parseInt(event.addressId)
             if (!isNaN(index) && index >= 0 && index < addresses.length) {
-              // Это индекс, сохраняем его как строку, API разберётся
               addressId = String(index)
             } else if (event.addressId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-              // Это реальный UUID
               addressId = event.addressId
-            } else {
-              // Непонятный формат, оставляем null
-              addressId = null
             }
           }
-
           return {
             type: event.type,
             status: event.status || 'pending',
             scheduledDate: event.scheduledDate || null,
-            title: event.title?.trim() || null,
-            description: event.description?.trim() || null,
-            addressId: addressId,  // <-- ВАЖНО: null или индекс
+            description: event.description || null,
+            addressId: addressId,
           }
         }),
-
-        // Участники
         participants: participants.map(p => ({
           userId: p.userId,
           role: p.role,
         }))
       }
 
-      // Логируем отправляемые данные для отладки
-      console.log('📤 Отправка данных на сервер:')
-      console.log('  - Название:', submitData.title)
-      console.log('  - Клиент:', submitData.clientId)
-      console.log('  - Адресов:', submitData.addresses.length)
-      console.log('  - Событий:', submitData.events.length)
-      console.log('  - Участников:', submitData.participants.length)
-      console.log('📦 Полные данные:', JSON.stringify(submitData, null, 2))
+      // Логируем для отладки
+      console.log('📤 Отправка адресов:', submitData.addresses)
 
-      // Определяем URL и метод
       const url = isEdit ? `/api/orders/${order.id}` : '/api/orders'
       const method = isEdit ? 'PUT' : 'POST'
 
-      // Отправляем запрос
       const res = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(submitData),
       })
 
-      // Получаем ответ
       const responseData = await res.json()
 
-      // Проверяем ответ
       if (!res.ok) {
-        console.error('❌ Ошибка сервера:', responseData)
         throw new Error(responseData.error || 'Ошибка при сохранении заказа')
       }
 
-      console.log('✅ Заказ успешно сохранён:', responseData.id)
-
-      // Перенаправляем на страницу заказа
       router.push(`/order/${responseData.id}`)
     } catch (error) {
-      console.error('❌ Ошибка при сохранении:', error)
+      console.error('Submit error:', error)
       alert(error.message || 'Произошла ошибка при сохранении заказа')
     } finally {
       setLoading(false)
     }
   }
-
+  
   const eventTypeOptions = Object.entries(EVENT_TYPES).map(([key, value]) => ({
     value: key,
     label: value.label,
@@ -560,7 +562,19 @@ export default function OrderForm({ order = null, isEdit = false }) {
           </div>
           <button
             type="button"
-            onClick={() => setShowAddressForm(true)}
+            onClick={() => {
+              setEditingAddressId(null)
+              setNewAddress({
+                address: '',
+                city: '',
+                entrance: '',
+                floor: '',
+                apartment: '',
+                intercom: '',
+                isDefault: false,
+              })
+              setShowAddressForm(true)
+            }}
             className="inline-flex items-center gap-1 rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-400 transition-colors"
           >
             <PlusIcon className="size-4" />
@@ -581,23 +595,23 @@ export default function OrderForm({ order = null, isEdit = false }) {
                           Основной
                         </span>
                       )}
-                      {addr.title && (
-                        <span className="text-sm font-medium text-white">{addr.title}</span>
-                      )}
                     </div>
-                    <p className="text-sm text-gray-400 mt-1">{addr.address}</p>
+                    <p className="text-sm text-white mt-1">{addr.address}</p>
                     <div className="flex flex-wrap gap-3 mt-1 text-xs text-gray-500">
-                      {addr.city && <span>Город: {addr.city}</span>}
-                      {addr.entrance && <span>Подъезд: {addr.entrance}</span>}
-                      {addr.floor && <span>Этаж: {addr.floor}</span>}
-                      {addr.apartment && <span>Кв: {addr.apartment}</span>}
-                      {addr.intercom && <span>Домофон: {addr.intercom}</span>}
+                      {addr.city && <span>🏙️ {addr.city}</span>}
+                      {addr.entrance && <span>🚪 Подъезд: {addr.entrance}</span>}
+                      {addr.floor && <span>🏢 Этаж: {addr.floor}</span>}
+                      {addr.apartment && <span>📮 Кв: {addr.apartment}</span>}
+                      {addr.intercom && <span>📞 Домофон: {addr.intercom}</span>}
                     </div>
-                    {addr.comment && (
-                      <p className="text-xs text-gray-500 mt-1">{addr.comment}</p>
-                    )}
                   </div>
                   <div className="flex gap-2">
+                    <div className="flex-shrink-0">
+                      <MapButtons
+                        address={addr.address}
+                        city={addr.city}
+                      />
+                    </div>
                     {!addr.isDefault && (
                       <button
                         type="button"
@@ -607,6 +621,13 @@ export default function OrderForm({ order = null, isEdit = false }) {
                         Сделать основным
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => handleEditAddress(addr)}
+                      className="text-blue-400 hover:text-blue-300"
+                    >
+                      <PencilIcon className="size-4" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleRemoveAddress(addr.id)}
@@ -621,14 +642,19 @@ export default function OrderForm({ order = null, isEdit = false }) {
           </div>
         )}
 
-        {/* Форма добавления адреса */}
+        {/* Форма добавления/редактирования адреса */}
         {showAddressForm && (
           <div className="mt-4 bg-white/5 rounded-lg p-4 border border-indigo-500/20">
             <div className="flex justify-between items-center mb-3">
-              <h3 className="text-sm font-medium text-white">Новый адрес</h3>
+              <h3 className="text-sm font-medium text-white">
+                {editingAddressId ? 'Редактирование адреса' : 'Новый адрес'}
+              </h3>
               <button
                 type="button"
-                onClick={() => setShowAddressForm(false)}
+                onClick={() => {
+                  setShowAddressForm(false)
+                  setEditingAddressId(null)
+                }}
                 className="text-gray-400 hover:text-white"
               >
                 <XMarkIcon className="size-5" />
@@ -637,32 +663,32 @@ export default function OrderForm({ order = null, isEdit = false }) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Название</label>
-                <input
-                  type="text"
-                  value={newAddress.title}
-                  onChange={(e) => setNewAddress({ ...newAddress, title: e.target.value })}
-                  placeholder="Дом, офис, склад..."
-                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Адрес *</label>
-                <input
-                  type="text"
-                  value={newAddress.address}
-                  onChange={(e) => setNewAddress({ ...newAddress, address: e.target.value })}
-                  placeholder="Улица, дом..."
-                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-              <div>
                 <label className="block text-xs text-gray-400 mb-1">Город</label>
                 <input
                   type="text"
                   value={newAddress.city}
                   onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
                   placeholder="Город"
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Улица *</label>
+                <input
+                  type="text"
+                  value={newAddress.street}
+                  onChange={(e) => setNewAddress({ ...newAddress, street: e.target.value })}
+                  placeholder="Улица"
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Дом *</label>
+                <input
+                  type="text"
+                  value={newAddress.house}
+                  onChange={(e) => setNewAddress({ ...newAddress, house: e.target.value })}
+                  placeholder="Номер дома"
                   className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
                 />
               </div>
@@ -677,16 +703,6 @@ export default function OrderForm({ order = null, isEdit = false }) {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Этаж</label>
-                <input
-                  type="text"
-                  value={newAddress.floor}
-                  onChange={(e) => setNewAddress({ ...newAddress, floor: e.target.value })}
-                  placeholder="Этаж"
-                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-              <div>
                 <label className="block text-xs text-gray-400 mb-1">Квартира</label>
                 <input
                   type="text"
@@ -697,22 +713,22 @@ export default function OrderForm({ order = null, isEdit = false }) {
                 />
               </div>
               <div>
+                <label className="block text-xs text-gray-400 mb-1">Этаж</label>
+                <input
+                  type="text"
+                  value={newAddress.floor}
+                  onChange={(e) => setNewAddress({ ...newAddress, floor: e.target.value })}
+                  placeholder="Этаж"
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
                 <label className="block text-xs text-gray-400 mb-1">Домофон</label>
                 <input
                   type="text"
                   value={newAddress.intercom}
                   onChange={(e) => setNewAddress({ ...newAddress, intercom: e.target.value })}
                   placeholder="Код домофона"
-                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Комментарий</label>
-                <input
-                  type="text"
-                  value={newAddress.comment}
-                  onChange={(e) => setNewAddress({ ...newAddress, comment: e.target.value })}
-                  placeholder="Дополнительная информация"
                   className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
                 />
               </div>
@@ -736,7 +752,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
               onClick={handleAddAddress}
               className="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
             >
-              Добавить адрес
+              {editingAddressId ? 'Сохранить адрес' : 'Добавить адрес'}
             </button>
           </div>
         )}
@@ -752,7 +768,17 @@ export default function OrderForm({ order = null, isEdit = false }) {
           </div>
           <button
             type="button"
-            onClick={() => setShowEventForm(true)}
+            onClick={() => {
+              setEditingEventId(null)
+              setNewEvent({
+                type: 'measurement',
+                status: 'pending',
+                scheduledDate: '',
+                description: '',
+                addressId: '',
+              })
+              setShowEventForm(true)
+            }}
             className="inline-flex items-center gap-1 rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-400 transition-colors"
           >
             <PlusIcon className="size-4" />
@@ -765,17 +791,18 @@ export default function OrderForm({ order = null, isEdit = false }) {
           <div className="space-y-3">
             {events.map((event) => {
               const typeInfo = EVENT_TYPES[event.type]
+              const statusInfo = EVENT_STATUSES[event.status] || EVENT_STATUSES.pending
               return (
                 <div key={event.id} className="bg-white/5 rounded-lg p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${typeInfo?.color || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
                           {typeInfo?.icon} {typeInfo?.label || event.type}
                         </span>
-                        {event.title && (
-                          <span className="text-sm font-medium text-white">{event.title}</span>
-                        )}
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${statusInfo.color}`}>
+                          {statusInfo.label}
+                        </span>
                         {event.scheduledDate && (
                           <span className="text-xs text-gray-400">
                             {new Date(event.scheduledDate).toLocaleDateString('ru-RU')}
@@ -791,13 +818,22 @@ export default function OrderForm({ order = null, isEdit = false }) {
                         </p>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveEvent(event.id)}
-                      className="text-red-400 hover:text-red-300"
-                    >
-                      <TrashIcon className="size-4" />
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleEditEvent(event)}
+                        className="text-blue-400 hover:text-blue-300"
+                      >
+                        <PencilIcon className="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveEvent(event.id)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <TrashIcon className="size-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               )
@@ -805,14 +841,19 @@ export default function OrderForm({ order = null, isEdit = false }) {
           </div>
         )}
 
-        {/* Форма добавления события */}
+        {/* Форма добавления/редактирования события */}
         {showEventForm && (
           <div className="mt-4 bg-white/5 rounded-lg p-4 border border-indigo-500/20">
             <div className="flex justify-between items-center mb-3">
-              <h3 className="text-sm font-medium text-white">Новое событие</h3>
+              <h3 className="text-sm font-medium text-white">
+                {editingEventId ? 'Редактирование события' : 'Новое событие'}
+              </h3>
               <button
                 type="button"
-                onClick={() => setShowEventForm(false)}
+                onClick={() => {
+                  setShowEventForm(false)
+                  setEditingEventId(null)
+                }}
                 className="text-gray-400 hover:text-white"
               >
                 <XMarkIcon className="size-5" />
@@ -835,21 +876,25 @@ export default function OrderForm({ order = null, isEdit = false }) {
                 </select>
               </div>
               <div>
+                <label className="block text-xs text-gray-400 mb-1">Статус</label>
+                <select
+                  value={newEvent.status}
+                  onChange={(e) => setNewEvent({ ...newEvent, status: e.target.value })}
+                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                >
+                  {Object.entries(EVENT_STATUSES).map(([key, value]) => (
+                    <option key={key} value={key}>
+                      {value.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="block text-xs text-gray-400 mb-1">Дата *</label>
                 <input
                   type="date"
                   value={newEvent.scheduledDate}
                   onChange={(e) => setNewEvent({ ...newEvent, scheduledDate: e.target.value })}
-                  className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Название</label>
-                <input
-                  type="text"
-                  value={newEvent.title}
-                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                  placeholder="Название события"
                   className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
                 />
               </div>
@@ -861,9 +906,9 @@ export default function OrderForm({ order = null, isEdit = false }) {
                   className="w-full rounded-md bg-white/5 px-3 py-1.5 text-sm text-white border border-white/10 focus:outline-none focus:border-indigo-500"
                 >
                   <option value="">Без адреса</option>
-                  {addresses.map((addr) => (
+                  {addresses.map((addr, index) => (
                     <option key={addr.id} value={addr.id}>
-                      {addr.title || addr.address}
+                      {addr.address}
                     </option>
                   ))}
                 </select>
@@ -885,7 +930,7 @@ export default function OrderForm({ order = null, isEdit = false }) {
               onClick={handleAddEvent}
               className="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
             >
-              Добавить событие
+              {editingEventId ? 'Сохранить событие' : 'Добавить событие'}
             </button>
           </div>
         )}
