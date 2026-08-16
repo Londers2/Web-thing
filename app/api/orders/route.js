@@ -48,7 +48,6 @@ export async function GET(request, { params }) {
   }
 }
 
-// PUT - обновить заказ с адресами и событиями
 export async function POST(request) {
   try {
     const session = await getServerSession(authOptions)
@@ -58,29 +57,35 @@ export async function POST(request) {
     
     const body = await request.json()
     
-    console.log('📦 Создание заказа, полученные данные:')
-    console.log('  addresses:', body.addresses?.length || 0)
-    console.log('  events:', body.events?.length || 0)
+    console.log('📦 Полученные данные:', {
+      title: body.title,
+      clientId: body.clientId,
+      addressesCount: body.addresses?.length || 0,
+      eventsCount: body.events?.length || 0,
+    })
     
-    // 1. Создаём заказ
+    // 1. Создаём заказ с правильными значениями
     const orderData = {
       title: body.title,
       description: body.description || null,
       status: body.status || 'new',
       priority: body.priority || 'medium',
       totalAmount: body.totalAmount || null,
-      clientId: body.clientId || null,
+      clientId: body.clientId || null,  // <-- null вместо пустой строки
       userId: session.user.id,
     }
+    
+    console.log('📦 Данные для создания заказа:', orderData)
     
     const order = await Order.create(orderData)
     console.log('✅ Заказ создан:', order.id)
     
-    // 2. Создаём адреса и запоминаем их ID
-    const addressMap = {}
+    // 2. Создаём адреса
+    const createdAddresses = []
     if (body.addresses && body.addresses.length > 0) {
-      for (let i = 0; i < body.addresses.length; i++) {
-        const addr = body.addresses[i]
+      console.log(`📌 Добавление ${body.addresses.length} адресов...`)
+      
+      for (const addr of body.addresses) {
         const newAddress = await Address.create({
           title: addr.title || null,
           address: addr.address,
@@ -94,29 +99,29 @@ export async function POST(request) {
           orderId: order.id,
           clientId: body.clientId || null,
         })
-        // Сохраняем связь: индекс адреса -> реальный ID
-        addressMap[i] = newAddress.id
-        console.log(`  ✅ Адрес ${i + 1} создан: ${newAddress.id}`)
+        createdAddresses.push(newAddress)
+        console.log(`  ✅ Адрес создан: ${newAddress.id}`)
       }
     }
     
-    // 3. Создаём события с правильной привязкой к адресам
+    // 3. Создаём события с привязкой к адресам
     if (body.events && body.events.length > 0) {
-      for (const event of body.events) {
-        let addressId = event.addressId || null
+      console.log(`📅 Добавление ${body.events.length} событий...`)
+      
+      for (let i = 0; i < body.events.length; i++) {
+        const event = body.events[i]
         
-        // Если addressId передан как строка с индексом (например, "0", "1")
-        // или как временный ID, пытаемся найти реальный ID
-        if (addressId && typeof addressId === 'string') {
-          // Проверяем, может это индекс адреса
-          const index = parseInt(addressId)
-          if (!isNaN(index) && addressMap[index] !== undefined) {
-            addressId = addressMap[index]
-            console.log(`  🔗 Событие привязано к адресу #${index} (${addressId})`)
-          } else if (addressId.startsWith('temp-')) {
-            // Это временный ID, заменяем на null
-            console.log(`  ⚠️ Временный ID адреса, заменяем на null`)
-            addressId = null
+        // Определяем addressId
+        let addressId = null
+        if (event.addressId) {
+          // Если addressId — это индекс (число)
+          const index = parseInt(event.addressId)
+          if (!isNaN(index) && createdAddresses[index]) {
+            addressId = createdAddresses[index].id
+            console.log(`  🔗 Событие ${i + 1} привязано к адресу #${index}`)
+          } else {
+            // Если addressId — это реальный UUID
+            addressId = event.addressId
           }
         }
         
@@ -126,15 +131,16 @@ export async function POST(request) {
           scheduledDate: event.scheduledDate || null,
           title: event.title || null,
           description: event.description || null,
-          addressId: addressId || null,
+          addressId: addressId,
           orderId: order.id,
         })
-        console.log(`  ✅ Событие создано: ${newEvent.id}`)
+        console.log(`  ✅ Событие ${i + 1} создано: ${newEvent.id}`)
       }
     }
     
     // 4. Добавляем участников
     if (body.participants && body.participants.length > 0) {
+      console.log(`👥 Добавление ${body.participants.length} участников...`)
       const participants = body.participants.map(p => ({
         orderId: order.id,
         userId: p.userId,
@@ -156,6 +162,7 @@ export async function POST(request) {
       ],
     })
     
+    console.log('✅ Заказ успешно создан со всеми связями')
     return NextResponse.json(orderWithRelations, { status: 201 })
   } catch (error) {
     console.error('❌ POST Order Error:', error)

@@ -23,38 +23,12 @@ import {
   DocumentTextIcon,
   InformationCircleIcon,
   PhoneIcon,
-  ClockIcon,
-  CubeIcon,
-  ClipboardDocumentCheckIcon
+  ClockIcon
 } from '@heroicons/react/24/outline'
-import { EVENT_TYPES } from '@/lib/constants/eventTypes'
 
 const ITEMS_PER_PAGE = 10
 
-const statusConfig = {
-  new: { label: 'Новый', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-  in_progress: { label: 'В работе', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
-  completed: { label: 'Выполнен', color: 'bg-green-500/10 text-green-400 border-green-500/20' },
-  cancelled: { label: 'Отменён', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
-}
-
-const priorityConfig = {
-  low: { label: 'Низкий', color: 'text-gray-400' },
-  medium: { label: 'Средний', color: 'text-yellow-400' },
-  high: { label: 'Высокий', color: 'text-red-400' },
-}
-
-function EventBadge({ type }) {
-  const config = EVENT_TYPES[type]
-  if (!config) return null
-  
-  return (
-    <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full border ${config.color}`}>
-      {config.icon} {config.label}
-    </span>
-  )
-}
-
+// Компонент для форматирования телефона
 function FormattedPhone({ phone }) {
   if (!phone) return null
   
@@ -105,6 +79,7 @@ function FormattedPhone({ phone }) {
   )
 }
 
+// Компонент информации о поиске
 function SearchInfo() {
   return (
     <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
@@ -114,18 +89,45 @@ function SearchInfo() {
   )
 }
 
+// Статусы и приоритеты
+const statusConfig = {
+  new: { label: 'Новый', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+  in_progress: { label: 'В работе', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
+  completed: { label: 'Выполнен', color: 'bg-green-500/10 text-green-400 border-green-500/20' },
+  cancelled: { label: 'Отменён', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
+}
+
+const priorityConfig = {
+  low: { label: 'Низкий', color: 'text-gray-400' },
+  medium: { label: 'Средний', color: 'text-yellow-400' },
+  high: { label: 'Высокий', color: 'text-red-400' },
+}
+
 export default function OrderList() {
   const [allOrders, setAllOrders] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [localSearch, setLocalSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: ITEMS_PER_PAGE,
+    totalPages: 0
+  })
+  const isFirstRender = useRef(true)
   
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      fetchAllOrders()
+      return
+    }
+    
     fetchAllOrders()
-  }, [filter])
+  }, [filter, search, currentPage])
   
   const fetchAllOrders = async () => {
     try {
@@ -134,39 +136,116 @@ export default function OrderList() {
       
       const params = new URLSearchParams()
       if (filter !== 'all') params.append('status', filter)
+      if (search.trim()) params.append('search', search.trim())
+      params.append('page', currentPage)
+      params.append('limit', ITEMS_PER_PAGE)
       
-      const res = await fetch(`/api/orders?${params}`)
+      const response = await fetch(`/api/orders?${params}`)
       
-      if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || 'Ошибка загрузки заказов')
+      // Проверяем статус ответа
+      if (!response.ok) {
+        let errorMessage = 'Ошибка загрузки заказов'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorMessage
+        } catch (e) {
+          console.error('Ошибка парсинга ответа об ошибке:', e)
+        }
+        throw new Error(errorMessage)
       }
       
-      const data = await res.json()
-      setAllOrders(data.data || [])
+      // Парсим JSON с защитой от ошибок
+      let data
+      try {
+        data = await response.json()
+      } catch (e) {
+        console.error('Ошибка парсинга JSON:', e)
+        throw new Error('Некорректный ответ от сервера')
+      }
+      
+      // Проверяем структуру ответа
+      let orders = []
+      let paginationData = {
+        total: 0,
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+        totalPages: 0
+      }
+      
+      if (data && typeof data === 'object') {
+        // Проверяем наличие поля data с массивом заказов
+        if (data.data && Array.isArray(data.data)) {
+          orders = data.data
+          if (data.pagination) {
+            paginationData = {
+              total: data.pagination.total || 0,
+              page: data.pagination.page || currentPage,
+              limit: data.pagination.limit || ITEMS_PER_PAGE,
+              totalPages: data.pagination.totalPages || 0
+            }
+          }
+        } 
+        // Если data — это сам массив заказов
+        else if (Array.isArray(data)) {
+          orders = data
+          paginationData = {
+            total: data.length,
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+            totalPages: Math.ceil(data.length / ITEMS_PER_PAGE)
+          }
+        }
+        // Неизвестная структура
+        else {
+          console.warn('Неизвестная структура ответа:', data)
+          orders = []
+        }
+      } else {
+        console.warn('Некорректный ответ:', data)
+        orders = []
+      }
+      
+      setAllOrders(orders)
+      setPagination(paginationData)
+      
     } catch (error) {
       console.error('Error fetching orders:', error)
       setError(error.message || 'Ошибка загрузки заказов')
       setAllOrders([])
+      setPagination({
+        total: 0,
+        page: 1,
+        limit: ITEMS_PER_PAGE,
+        totalPages: 0
+      })
     } finally {
       setLoading(false)
     }
   }
   
+  // Фильтрация на клиенте (если нужна дополнительная)
   const filteredOrders = useMemo(() => {
     if (!search.trim()) return allOrders
     
     const searchLower = search.trim().toLowerCase()
     
     return allOrders.filter(order => {
+      // Поиск по названию
       if (order.title?.toLowerCase().includes(searchLower)) return true
+      
+      // Поиск по описанию
       if (order.description?.toLowerCase().includes(searchLower)) return true
       
+      // Поиск по адресу
+      if (order.address?.toLowerCase().includes(searchLower)) return true
+      
+      // Поиск по клиенту
       if (order.client) {
         if (order.client.name?.toLowerCase().includes(searchLower)) return true
         if (order.client.phone?.includes(search.trim())) return true
       }
       
+      // Поиск по участникам
       if (order.order_participants) {
         for (const p of order.order_participants) {
           if (p.user?.name?.toLowerCase().includes(searchLower)) return true
@@ -177,16 +256,26 @@ export default function OrderList() {
     })
   }, [allOrders, search])
   
-  const totalCount = filteredOrders.length
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE) || 1
-  const paginatedOrders = filteredOrders.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  )
+  // Используем данные пагинации из ответа или вычисляем на клиенте
+  const totalCount = pagination.total || filteredOrders.length
+  const totalPages = pagination.totalPages || Math.ceil(totalCount / ITEMS_PER_PAGE) || 1
   
+  // Пагинация на клиенте (если API не возвращает пагинированные данные)
+  const paginatedOrders = useMemo(() => {
+    // Если API уже вернул пагинированные данные, используем их
+    if (pagination.total > 0 && allOrders.length <= ITEMS_PER_PAGE) {
+      return filteredOrders
+    }
+    // Иначе пагинируем на клиенте
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    const end = start + ITEMS_PER_PAGE
+    return filteredOrders.slice(start, end)
+  }, [filteredOrders, currentPage, pagination.total, allOrders.length])
+  
+  // Сбрасываем страницу при поиске или фильтре
   useEffect(() => {
     setCurrentPage(1)
-  }, [search])
+  }, [search, filter])
   
   const debouncedSearch = useCallback(
     debounce((value) => {
@@ -318,7 +407,7 @@ export default function OrderList() {
       )}
       
       {/* Результаты */}
-      {!loading && filteredOrders.length === 0 && (
+      {!loading && paginatedOrders.length === 0 && (
         <div className="text-center py-12">
           <div className="mx-auto size-12 rounded-full bg-white/5 flex items-center justify-center mb-4">
             <PhotoIcon className="size-6 text-gray-400" />
@@ -343,26 +432,25 @@ export default function OrderList() {
       )}
       
       {/* Список заказов */}
-      {!loading && filteredOrders.length > 0 && (
+      {!loading && paginatedOrders.length > 0 && (
         <div className="space-y-4">
           {paginatedOrders.map((order) => (
             <div
               key={order.id}
               className="group relative rounded-xl bg-white/5 p-5 hover:bg-white/10 transition-colors"
             >
-              {/* Заголовок и статусы */}
               <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Link href={`/order/${order.id}`}>
                     <h3 className="text-base font-semibold text-white hover:text-indigo-400 transition-colors">
-                      {order.title}
+                      {order.title || 'Без названия'}
                     </h3>
                   </Link>
                   <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${statusConfig[order.status]?.color || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                    {statusConfig[order.status]?.label || order.status}
+                    {statusConfig[order.status]?.label || order.status || 'Новый'}
                   </span>
                   <span className={`text-xs ${priorityConfig[order.priority]?.color || 'text-gray-400'}`}>
-                    {priorityConfig[order.priority]?.label || order.priority}
+                    {priorityConfig[order.priority]?.label || order.priority || 'Средний'}
                   </span>
                 </div>
                 
@@ -374,7 +462,7 @@ export default function OrderList() {
                     <PencilIcon className="size-4" />
                   </Link>
                   <button
-                    onClick={() => handleDelete(order.id, order.title)}
+                    onClick={() => handleDelete(order.id, order.title || 'заказ')}
                     className="rounded-md bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-400 hover:bg-red-500/20 transition-colors"
                   >
                     <TrashIcon className="size-4" />
@@ -382,7 +470,6 @@ export default function OrderList() {
                 </div>
               </div>
               
-              {/* Описание */}
               {order.description && (
                 <div className="mb-3 text-sm text-gray-400 line-clamp-2">
                   <DocumentTextIcon className="size-3.5 inline mr-1" />
@@ -390,37 +477,25 @@ export default function OrderList() {
                 </div>
               )}
               
-              {/* Разделитель */}
               <div className="border-t border-white/5 my-3" />
               
-              {/* Блок с датами и событиями */}
               <div className="flex flex-wrap items-center gap-3 mb-3">
-                {order.events && order.events.length > 0 ? (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <ClipboardDocumentCheckIcon className="size-4 text-gray-400" />
-                    {order.events.slice(0, 3).map((event, idx) => (
-                      <EventBadge key={idx} type={event.type} />
-                    ))}
-                    {order.events.length > 3 && (
-                      <span className="text-xs text-gray-500">+{order.events.length - 3}</span>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-xs text-gray-500">Нет событий</span>
-                )}
-                
                 {order.totalAmount && (
                   <span className="flex items-center gap-1 text-sm text-gray-300">
                     <CurrencyDollarIcon className="size-4" />
                     {Number(order.totalAmount).toLocaleString()} ₽
                   </span>
                 )}
+                {order.date && (
+                  <span className="flex items-center gap-1 text-sm text-gray-400">
+                    <CalendarIcon className="size-4" />
+                    {new Date(order.date).toLocaleDateString('ru-RU')}
+                  </span>
+                )}
               </div>
               
-              {/* Разделитель */}
               <div className="border-t border-white/5 my-3" />
               
-              {/* Адреса */}
               {order.addresses && order.addresses.length > 0 && (
                 <div className="mb-3">
                   <div className="flex items-start gap-1.5 text-sm text-gray-400">
@@ -441,7 +516,6 @@ export default function OrderList() {
                 </div>
               )}
               
-              {/* Клиент */}
               {order.client && (
                 <div className="flex items-center gap-1.5 text-sm">
                   <UserIcon className="size-4 text-gray-400" />
@@ -449,7 +523,7 @@ export default function OrderList() {
                     href={`/clients/${order.client.id}`}
                     className="text-indigo-400 hover:text-indigo-300 transition-colors"
                   >
-                    {order.client.name}
+                    {order.client.name || 'Клиент'}
                   </Link>
                   {order.client.phone && (
                     <FormattedPhone phone={order.client.phone} />
@@ -457,14 +531,13 @@ export default function OrderList() {
                 </div>
               )}
               
-              {/* Участники заказа */}
               {order.order_participants && order.order_participants.length > 0 && (
                 <>
                   <div className="border-t border-white/5 my-3" />
                   <div className="flex items-start gap-2">
                     <UserGroupIcon className="size-4 text-gray-400 flex-shrink-0 mt-0.5" />
                     <div className="flex flex-wrap gap-1.5">
-                      {order.order_participants.map((p, idx) => (
+                      {order.order_participants.slice(0, 3).map((p, idx) => (
                         <span 
                           key={idx}
                           className="px-2 py-0.5 text-xs rounded-full border bg-gray-500/10 text-gray-400 border-gray-500/20"
@@ -475,19 +548,23 @@ export default function OrderList() {
                           </span>
                         </span>
                       ))}
+                      {order.order_participants.length > 3 && (
+                        <span className="text-xs text-gray-500">
+                          +{order.order_participants.length - 3}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </>
               )}
               
-              {/* Дата создания */}
               <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-1.5 text-xs text-gray-500">
                 <ClockIcon className="size-3.5" />
-                <span>Создан: {new Date(order.createdAt).toLocaleDateString('ru-RU', {
+                <span>Создан: {order.createdAt ? new Date(order.createdAt).toLocaleDateString('ru-RU', {
                   day: '2-digit',
                   month: 'short',
                   year: 'numeric'
-                })}</span>
+                }) : '—'}</span>
               </div>
             </div>
           ))}

@@ -307,85 +307,106 @@ export default function OrderForm({ order = null, isEdit = false }) {
     setLoading(true)
 
     try {
-      // Сначала создаём маппинг временных ID адресов на реальные
-      // Для этого сначала создаём адреса, потом события с правильными ID
-
-      // 1. Подготавливаем данные для адресов
-      const addressData = addresses.map(addr => ({
-        title: addr.title || null,
-        address: addr.address,
-        city: addr.city || null,
-        entrance: addr.entrance || null,
-        floor: addr.floor || null,
-        apartment: addr.apartment || null,
-        intercom: addr.intercom || null,
-        comment: addr.comment || null,
-        isDefault: addr.isDefault || false,
-        // Не передаём ID, пусть создаётся новый
-      }))
-
-      // 2. Подготавливаем данные для событий
-      // Если у события есть addressId, но он начинается с "temp-",
-      // значит это ссылка на ещё не созданный адрес — оставляем null
-      const eventData = events.map(event => {
-        let addressId = event.addressId || null
-
-        // Если addressId начинается с "temp-" или это не UUID, значит адрес ещё не создан
-        if (addressId && (addressId.startsWith('temp-') || !addressId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i))) {
-          console.log(`⚠️ Событие "${event.title || event.type}" привязано к временному адресу, заменяем на null`)
-          addressId = null
-        }
-
-        return {
-          type: event.type,
-          status: event.status || 'pending',
-          scheduledDate: event.scheduledDate || null,
-          title: event.title || null,
-          description: event.description || null,
-          addressId: addressId,
-        }
-      })
-
+      // Подготавливаем данные для отправки
+      // Все UUID поля должны быть null, а не пустые строки
       const submitData = {
-        title: formData.title,
-        description: formData.description || null,
-        status: formData.status,
-        priority: formData.priority,
+        // Основные поля заказа
+        title: formData.title.trim(),
+        description: formData.description?.trim() || null,
+        status: formData.status || 'new',
+        priority: formData.priority || 'medium',
         totalAmount: formData.totalAmount || null,
-        clientId: formData.clientId || null,
-        addresses: addressData,
-        events: eventData,
+        clientId: formData.clientId || null,  // <-- ВАЖНО: null вместо пустой строки
+
+        // Адреса
+        addresses: addresses.map(addr => ({
+          title: addr.title?.trim() || null,
+          address: addr.address?.trim(),
+          city: addr.city?.trim() || null,
+          entrance: addr.entrance?.trim() || null,
+          floor: addr.floor?.trim() || null,
+          apartment: addr.apartment?.trim() || null,
+          intercom: addr.intercom?.trim() || null,
+          comment: addr.comment?.trim() || null,
+          isDefault: addr.isDefault || false,
+        })),
+
+        // События
+        events: events.map(event => {
+          // Определяем addressId для события
+          let addressId = null
+
+          // Если у события есть addressId
+          if (event.addressId) {
+            // Проверяем, является ли это индексом адреса (число)
+            const index = parseInt(event.addressId)
+            if (!isNaN(index) && index >= 0 && index < addresses.length) {
+              // Это индекс, сохраняем его как строку, API разберётся
+              addressId = String(index)
+            } else if (event.addressId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+              // Это реальный UUID
+              addressId = event.addressId
+            } else {
+              // Непонятный формат, оставляем null
+              addressId = null
+            }
+          }
+
+          return {
+            type: event.type,
+            status: event.status || 'pending',
+            scheduledDate: event.scheduledDate || null,
+            title: event.title?.trim() || null,
+            description: event.description?.trim() || null,
+            addressId: addressId,  // <-- ВАЖНО: null или индекс
+          }
+        }),
+
+        // Участники
         participants: participants.map(p => ({
           userId: p.userId,
           role: p.role,
         }))
       }
 
-      console.log('📤 Отправка данных:', {
-        addresses: submitData.addresses,
-        events: submitData.events,
-        participants: submitData.participants,
-      })
+      // Логируем отправляемые данные для отладки
+      console.log('📤 Отправка данных на сервер:')
+      console.log('  - Название:', submitData.title)
+      console.log('  - Клиент:', submitData.clientId)
+      console.log('  - Адресов:', submitData.addresses.length)
+      console.log('  - Событий:', submitData.events.length)
+      console.log('  - Участников:', submitData.participants.length)
+      console.log('📦 Полные данные:', JSON.stringify(submitData, null, 2))
 
+      // Определяем URL и метод
       const url = isEdit ? `/api/orders/${order.id}` : '/api/orders'
       const method = isEdit ? 'PUT' : 'POST'
 
+      // Отправляем запрос
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(submitData),
       })
 
+      // Получаем ответ
+      const responseData = await res.json()
+
+      // Проверяем ответ
       if (!res.ok) {
-        const error = await res.json()
-        throw new Error(error.error || 'Ошибка при сохранении заказа')
+        console.error('❌ Ошибка сервера:', responseData)
+        throw new Error(responseData.error || 'Ошибка при сохранении заказа')
       }
 
-      const data = await res.json()
-      router.push(`/order/${data.id}`)
+      console.log('✅ Заказ успешно сохранён:', responseData.id)
+
+      // Перенаправляем на страницу заказа
+      router.push(`/order/${responseData.id}`)
     } catch (error) {
-      console.error('Submit error:', error)
-      alert(error.message || 'Ошибка при сохранении заказа')
+      console.error('❌ Ошибка при сохранении:', error)
+      alert(error.message || 'Произошла ошибка при сохранении заказа')
     } finally {
       setLoading(false)
     }
