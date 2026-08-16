@@ -1,6 +1,6 @@
 // app/layout.jsx
 import Providers from '@/components/providers'
-import Sidebar from '@/components/Sidebar'
+import Sidebar from '@/components/sidebar'
 import './globals.css'
 
 export default function RootLayout({ children }) {
