@@ -25,15 +25,15 @@ export default async function EditOrderPage({ params }) {
       },
       {
         model: Address,  // <-- Добавляем адреса
-        attributes: ['id', 'title', 'address', 'city', 'entrance', 'floor', 'apartment', 'intercom', 'comment', 'isDefault']
+        attributes: ['id', 'address', 'city', 'entrance', 'floor', 'apartment', 'intercom', 'comment', 'isDefault']
       },
       {
         model: Event,    // <-- Добавляем события
-        attributes: ['id', 'type', 'status', 'scheduledDate', 'title', 'description', 'addressId'],
+        attributes: ['id', 'type', 'status', 'scheduledDate', 'description', 'addressId'],
         include: [
           {
             model: Address,
-            attributes: ['id', 'title', 'address']
+            attributes: ['id', 'address']
           }
         ]
       }

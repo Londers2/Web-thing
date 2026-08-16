@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import debounce from 'lodash/debounce'
 import Pagination from '@/components/Pagination'
-import { 
+import {
   MagnifyingGlassIcon,
   PlusIcon,
   FunnelIcon,
@@ -46,12 +46,12 @@ const priorityConfig = {
 // Компонент для форматирования телефона
 function FormattedPhone({ phone }) {
   if (!phone) return null
-  
+
   const formatPhone = (raw) => {
     const cleaned = raw.replace(/\D/g, '')
     const limited = cleaned.slice(0, 11)
     if (limited.length === 0) return ''
-    
+
     let result = '+7'
     if (limited.length > 1) {
       result += ' ('
@@ -79,12 +79,12 @@ function FormattedPhone({ phone }) {
     }
     return result
   }
-  
+
   const formatted = formatPhone(phone)
   if (!formatted) return null
-  
+
   return (
-    <a 
+    <a
       href={`tel:${phone}`}
       className="hover:text-indigo-400 transition-colors flex items-center gap-1"
     >
@@ -119,30 +119,30 @@ export default function OrderList() {
     totalPages: 0
   })
   const isFirstRender = useRef(true)
-  
+
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false
       fetchAllOrders()
       return
     }
-    
+
     fetchAllOrders()
   }, [filter, search, currentPage])
-  
+
   const fetchAllOrders = async () => {
     try {
       setLoading(true)
       setError(null)
-      
+
       const params = new URLSearchParams()
       if (filter !== 'all') params.append('status', filter)
       if (search.trim()) params.append('search', search.trim())
       params.append('page', currentPage)
       params.append('limit', ITEMS_PER_PAGE)
-      
+
       const response = await fetch(`/api/orders?${params}`)
-      
+
       if (!response.ok) {
         let errorMessage = 'Ошибка загрузки заказов'
         try {
@@ -153,9 +153,9 @@ export default function OrderList() {
         }
         throw new Error(errorMessage)
       }
-      
+
       let data = await response.json()
-      
+
       // Универсальная обработка ответа
       let orders = []
       let paginationData = {
@@ -164,7 +164,7 @@ export default function OrderList() {
         limit: ITEMS_PER_PAGE,
         totalPages: 0
       }
-      
+
       if (data && data.data && Array.isArray(data.data)) {
         orders = data.data
         if (data.pagination) {
@@ -184,10 +184,10 @@ export default function OrderList() {
           totalPages: Math.ceil(data.length / ITEMS_PER_PAGE)
         }
       }
-      
+
       setAllOrders(orders)
       setPagination(paginationData)
-      
+
     } catch (error) {
       console.error('Error fetching orders:', error)
       setError(error.message || 'Ошибка загрузки заказов')
@@ -202,37 +202,37 @@ export default function OrderList() {
       setLoading(false)
     }
   }
-  
+
   // Фильтрация на клиенте
   const filteredOrders = useMemo(() => {
     if (!search.trim()) return allOrders
-    
+
     const searchLower = search.trim().toLowerCase()
-    
+
     return allOrders.filter(order => {
       if (!order) return false
       if (order.title?.toLowerCase().includes(searchLower)) return true
       if (order.description?.toLowerCase().includes(searchLower)) return true
       if (order.address?.toLowerCase().includes(searchLower)) return true
-      
+
       if (order.client) {
         if (order.client.name?.toLowerCase().includes(searchLower)) return true
         if (order.client.phone?.includes(search.trim())) return true
       }
-      
+
       if (order.order_participants && Array.isArray(order.order_participants)) {
         for (const p of order.order_participants) {
           if (p.user?.name?.toLowerCase().includes(searchLower)) return true
         }
       }
-      
+
       return false
     })
   }, [allOrders, search])
-  
+
   const totalCount = pagination.total || filteredOrders.length
   const totalPages = pagination.totalPages || Math.ceil(totalCount / ITEMS_PER_PAGE) || 1
-  
+
   const paginatedOrders = useMemo(() => {
     if (pagination.total > 0 && allOrders.length <= ITEMS_PER_PAGE) {
       return filteredOrders
@@ -241,48 +241,48 @@ export default function OrderList() {
     const end = start + ITEMS_PER_PAGE
     return filteredOrders.slice(start, end)
   }, [filteredOrders, currentPage, pagination.total, allOrders.length])
-  
+
   useEffect(() => {
     setCurrentPage(1)
   }, [search, filter])
-  
+
   const debouncedSearch = useCallback(
     debounce((value) => {
       setSearch(value)
     }, 500),
     []
   )
-  
+
   const handleSearchChange = (e) => {
     const value = e.target.value
     setLocalSearch(value)
     debouncedSearch(value)
   }
-  
+
   const handleClearSearch = () => {
     setLocalSearch('')
     setSearch('')
     debouncedSearch.cancel()
   }
-  
+
   const handleFilterChange = (e) => {
     setFilter(e.target.value)
     setCurrentPage(1)
   }
-  
+
   const handlePageChange = (page) => {
     setCurrentPage(page)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
-  
+
   const handleDelete = async (id, title) => {
     if (!confirm(`Удалить заказ "${title}"?`)) return
-    
+
     try {
       const res = await fetch(`/api/orders/${id}`, {
         method: 'DELETE',
       })
-      
+
       if (res.ok) {
         await fetchAllOrders()
       } else {
@@ -294,18 +294,18 @@ export default function OrderList() {
       alert('Ошибка при удалении заказа')
     }
   }
-  
+
   useEffect(() => {
     return () => {
       debouncedSearch.cancel()
     }
   }, [debouncedSearch])
-  
+
   if (error) {
     return (
       <div className="text-center py-12">
         <p className="text-red-400">{error}</p>
-        <button 
+        <button
           onClick={fetchAllOrders}
           className="mt-4 rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-400"
         >
@@ -314,7 +314,7 @@ export default function OrderList() {
       </div>
     )
   }
-  
+
   return (
     <div>
       {/* Поиск и фильтры */}
@@ -340,7 +340,7 @@ export default function OrderList() {
           </div>
           <SearchInfo />
         </div>
-        
+
         <div className="relative">
           <div className="flex items-center rounded-md bg-white/5 pl-3 outline-1 -outline-offset-1 outline-white/10 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-500">
             <FunnelIcon className="size-5 text-gray-400 shrink-0 ml-1" />
@@ -357,7 +357,7 @@ export default function OrderList() {
             </select>
           </div>
         </div>
-        
+
         <Link
           href="/order/new"
           className="inline-flex items-center gap-2 rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 whitespace-nowrap"
@@ -366,7 +366,7 @@ export default function OrderList() {
           Создать заказ
         </Link>
       </div>
-      
+
       {/* Статус загрузки */}
       {loading && (
         <div className="text-center py-12">
@@ -374,7 +374,7 @@ export default function OrderList() {
           <p className="mt-4 text-gray-400">Загрузка заказов...</p>
         </div>
       )}
-      
+
       {/* Результаты */}
       {!loading && paginatedOrders.length === 0 && (
         <div className="text-center py-12">
@@ -399,7 +399,7 @@ export default function OrderList() {
           )}
         </div>
       )}
-      
+
       {/* Список заказов */}
       {!loading && paginatedOrders.length > 0 && (
         <div className="space-y-4">
@@ -422,7 +422,7 @@ export default function OrderList() {
                     {priorityConfig[order.priority]?.label || order.priority || 'Средний'}
                   </span>
                 </div>
-                
+
                 <div className="flex gap-2">
                   <Link
                     href={`/order/${order.id}/edit`}
@@ -438,16 +438,16 @@ export default function OrderList() {
                   </button>
                 </div>
               </div>
-              
+
               {order.description && (
                 <div className="mb-3 text-sm text-gray-400 line-clamp-2">
                   <DocumentTextIcon className="size-3.5 inline mr-1" />
                   {order.description}
                 </div>
               )}
-              
+
               <div className="border-t border-white/5 my-3" />
-              
+
               <div className="flex flex-wrap items-center gap-3 mb-3">
                 {order.totalAmount && (
                   <span className="flex items-center gap-1 text-sm text-gray-300">
@@ -462,9 +462,9 @@ export default function OrderList() {
                   </span>
                 )}
               </div>
-              
+
               <div className="border-t border-white/5 my-3" />
-              
+
               {order.addresses && order.addresses.length > 0 && (
                 <div className="mb-3">
                   <div className="flex items-start gap-1.5 text-sm text-gray-400">
@@ -472,23 +472,22 @@ export default function OrderList() {
                     <div>
                       {order.addresses.map((addr, idx) => (
                         <div key={idx} className={idx > 0 ? 'mt-1' : ''}>
-                          {addr.address}
-                          {addr.title && (
-                            <span className="text-gray-500 text-xs ml-2">
-                              ({addr.title})
-                            </span>
-                          )}
+                          {addr.city && `${addr.city}, `}{addr.street}, д. {addr.house}
+                          {addr.apartment && `, кв. ${addr.apartment}`}
+                          {addr.entrance && `, подъезд ${addr.entrance}`}
+                          {addr.floor && `, этаж ${addr.floor}`}
+                          {addr.intercom && `, домофон ${addr.intercom}`}
                         </div>
                       ))}
                     </div>
                   </div>
                 </div>
               )}
-              
+
               {order.client && (
                 <div className="flex items-center gap-1.5 text-sm">
                   <UserIcon className="size-4 text-gray-400" />
-                  <Link 
+                  <Link
                     href={`/clients/${order.client.id}`}
                     className="text-indigo-400 hover:text-indigo-300 transition-colors"
                   >
@@ -499,7 +498,7 @@ export default function OrderList() {
                   )}
                 </div>
               )}
-              
+
               {order.order_participants && order.order_participants.length > 0 && (
                 <>
                   <div className="border-t border-white/5 my-3" />
@@ -507,7 +506,7 @@ export default function OrderList() {
                     <UserGroupIcon className="size-4 text-gray-400 flex-shrink-0 mt-0.5" />
                     <div className="flex flex-wrap gap-1.5">
                       {order.order_participants.slice(0, 3).map((p, idx) => (
-                        <span 
+                        <span
                           key={idx}
                           className="px-2 py-0.5 text-xs rounded-full border bg-gray-500/10 text-gray-400 border-gray-500/20"
                         >
@@ -526,7 +525,7 @@ export default function OrderList() {
                   </div>
                 </>
               )}
-              
+
               <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-1.5 text-xs text-gray-500">
                 <ClockIcon className="size-3.5" />
                 <span>Создан: {order.createdAt ? new Date(order.createdAt).toLocaleDateString('ru-RU', {
@@ -537,7 +536,7 @@ export default function OrderList() {
               </div>
             </div>
           ))}
-          
+
           {/* Пагинация */}
           <Pagination
             currentPage={currentPage}

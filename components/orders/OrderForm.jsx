@@ -363,32 +363,20 @@ export default function OrderForm({ order = null, isEdit = false }) {
           intercom: addr.intercom || null,
           isDefault: addr.isDefault || false,
         })),
-        events: events.map(event => {
-          let addressId = null
-          if (event.addressId) {
-            const index = parseInt(event.addressId)
-            if (!isNaN(index) && index >= 0 && index < addresses.length) {
-              addressId = String(index)
-            } else if (event.addressId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-              addressId = event.addressId
-            }
-          }
-          return {
-            type: event.type,
-            status: event.status || 'pending',
-            scheduledDate: event.scheduledDate || null,
-            description: event.description || null,
-            addressId: addressId,
-          }
-        }),
+        events: events.map(event => ({
+          type: event.type,
+          status: event.status || 'pending',
+          scheduledDate: event.scheduledDate || null,
+          description: event.description || null,
+          addressId: event.addressId || null,
+        })),
         participants: participants.map(p => ({
           userId: p.userId,
           role: p.role,
         }))
       }
 
-      // Логируем для отладки
-      console.log('📤 Отправка адресов:', submitData.addresses)
+      console.log('📤 Отправка данных:', JSON.stringify(submitData, null, 2))
 
       const url = isEdit ? `/api/orders/${order.id}` : '/api/orders'
       const method = isEdit ? 'PUT' : 'POST'
@@ -402,18 +390,20 @@ export default function OrderForm({ order = null, isEdit = false }) {
       const responseData = await res.json()
 
       if (!res.ok) {
+        console.error('❌ Ошибка сервера:', responseData)
         throw new Error(responseData.error || 'Ошибка при сохранении заказа')
       }
 
+      console.log('✅ Заказ успешно сохранён:', responseData.id)
       router.push(`/order/${responseData.id}`)
     } catch (error) {
-      console.error('Submit error:', error)
+      console.error('❌ Submit error:', error)
       alert(error.message || 'Произошла ошибка при сохранении заказа')
     } finally {
       setLoading(false)
     }
   }
-  
+
   const eventTypeOptions = Object.entries(EVENT_TYPES).map(([key, value]) => ({
     value: key,
     label: value.label,

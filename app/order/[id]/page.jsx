@@ -199,9 +199,9 @@ function EventsSection({ events }) {
                     {event.address && (
                       <div className="mt-1 flex items-start gap-1 text-xs text-gray-500">
                         <MapPinIcon className="size-3 flex-shrink-0 mt-0.5" />
-                        <span>{event.address.address}</span>
-                        {event.address.title && (
-                          <span className="text-gray-600">({event.address.title})</span>
+                        <span>{event.address.street}</span>
+                        {event.address.street && (
+                          <span className="text-gray-600">({event.address.street})</span>
                         )}
                       </div>
                     )}
